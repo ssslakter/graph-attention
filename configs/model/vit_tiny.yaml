@@ -1,0 +1,10 @@
+# @package _global_
+model:
+  _target_: graph_attention.models.simple_vit.SimpleViT
+  image_size: 32
+  patch_size: 4
+  dim: 128
+  depth: 4
+  heads: 2
+  mlp_dim: 256
+  dim_head: 64

@@ -1,0 +1,7 @@
+# @package _global_
+# No augmentation - for debugging/baseline
+dataset:
+  variant: cifar10
+  root: data
+  channels: 3
+  augmentation: none

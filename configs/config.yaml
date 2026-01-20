@@ -1,0 +1,48 @@
+defaults:
+  - model: vit_base
+  - dataset: cifar10
+  - dataloader: default
+  - optimizer: adamw
+  - scheduler: onecycle
+  - _self_
+
+run: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+training:
+  epochs: 30
+  use_amp: true
+  amp_dtype: float16
+  device: cuda
+  grad_clip: 1.0
+
+hooks:
+  checkpoint:
+    enabled: true
+    _target_: trainer_tools.hooks.CheckpointHook
+    save_dir: ${run}/checkpoints
+    save_every_steps: 1000
+    keep_last: 3
+    resume_path: ${hydra:runtime.output_dir}/checkpoints/checkpoint_interrupted.pt
+
+  ema:
+    enabled: true
+    _target_: trainer_tools.hooks.EMAHook
+    decay: 0.9999
+  
+  metrics:
+    enabled: true
+    _target_: trainer_tools.hooks.AccuracyMetricsHook
+    verbose: true
+    tracker_type: null  # 'wandb', 'trackio' or null
+    project: graph-attention
+    name: ${run}
+
+# Hydra configuration
+hydra:
+  run:
+    dir: outputs/${run}
+  sweep:
+    dir: multirun/${run}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: false

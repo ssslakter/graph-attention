@@ -1,0 +1,8 @@
+# @package _global_
+scheduler:
+  _target_: torch.optim.lr_scheduler.OneCycleLR
+  max_lr: ${optimizer.lr}
+  pct_start: 0.1
+  anneal_strategy: cos
+  div_factor: 10.0
+  final_div_factor: 100.0

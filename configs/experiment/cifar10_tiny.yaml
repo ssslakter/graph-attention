@@ -1,0 +1,20 @@
+# Example experiment configs
+# Use these to quickly run different configurations
+
+# To run: python train.py --config-name exp_tiny_cifar10
+
+defaults:
+  - /model: vit_tiny
+  - /dataset: cifar10
+  - /optimizer: adamw
+  - /scheduler: onecycle
+  - _self_
+
+run_name: tiny_cifar10
+
+training:
+  epochs: 50
+
+hooks:
+  checkpoint:
+    save_every_steps: 500
