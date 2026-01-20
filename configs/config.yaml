@@ -31,7 +31,7 @@ hooks:
   
   metrics:
     enabled: true
-    _target_: trainer_tools.hooks.AccuracyMetricsHook
+    _target_: graph_attention.hooks.AccuracyMetricsHook
     verbose: true
     tracker_type: null  # 'wandb', 'trackio' or null
     project: graph-attention

@@ -1,8 +1,15 @@
 [project]
-authors = [{name = "Slava Chaunin", email = "67190162+Ssslakter@users.noreply.github.com"}]
-dependencies = ["einops>=0.8.1,<0.9", "trainer-tools @ https://github.com/ssslakter/trainer-tools.git", "black>=26.1.0,<27", "numpy<2.4"]
+authors = [
+    { name = "Slava Chaunin", email = "67190162+Ssslakter@users.noreply.github.com" },
+]
+dependencies = [
+    "einops>=0.8.1,<0.9",
+    "trainer-tools @ https://github.com/ssslakter/trainer-tools.git",
+    "black>=26.1.0,<27",
+    "numpy<2.4",
+]
 name = "graph-attention"
-requires-python = ">= 3.11"
+requires-python = ">= 3.11,<3.14"
 version = "0.1.0"
 
 [build-system]
