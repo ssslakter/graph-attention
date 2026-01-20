@@ -19,7 +19,7 @@ hooks:
   checkpoint:
     enabled: true
     _target_: trainer_tools.hooks.CheckpointHook
-    save_dir: ${run}/checkpoints
+    save_dir: ${hydra:runtime.output_dir}/checkpoints
     save_every_steps: 1000
     keep_last: 3
     resume_path: ${hydra:runtime.output_dir}/checkpoints/checkpoint_interrupted.pt
