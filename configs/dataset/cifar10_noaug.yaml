@@ -1,5 +1,5 @@
-# @package _global_
 # No augmentation - for debugging/baseline
+# @package _global_
 dataset:
   variant: cifar10
   root: data

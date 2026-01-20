@@ -1,0 +1,6 @@
+# @package _group_
+_target_: graph_attention.models.layers.agf.AGFLayer
+_partial_: true
+defaults:
+  - /model/layers/estimator@graph_estimator: attention
+  - /model/layers/filter@graph_filter: polynomial

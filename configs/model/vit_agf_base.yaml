@@ -1,6 +1,6 @@
 # @package _global_
 defaults:
-  - /model/layers@model.attention_layer: attention
+  - /model/layers@model.attention_layer: agf
 
 model:
   _target_: graph_attention.models.simple_vit.SimpleViT

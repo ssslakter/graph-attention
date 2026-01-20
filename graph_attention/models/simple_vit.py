@@ -1,6 +1,8 @@
 # https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/simple_vit.py
 import torch
 from torch import nn
+from functools import partial
+from typing import Optional, Union, Tuple, Callable
 
 from einops import rearrange
 from einops.layers.torch import Rearrange
@@ -54,13 +56,18 @@ class Attention(nn.Module):
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
         self.to_out = nn.Linear(inner_dim, dim, bias=False)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         x = self.norm(x)
 
         qkv = self.to_qkv(x).chunk(3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=self.heads), qkv)
 
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+
+        if mask is not None:
+            # Mask should be broadcastable to (b, h, n, n)
+            mask_value = -torch.finfo(dots.dtype).max
+            dots = dots.masked_fill(mask == 0, mask_value)
 
         attn = self.attend(dots)
 
@@ -70,31 +77,60 @@ class Attention(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim):
+    """
+    Transformer encoder composed of multiple layers of Attention and FeedForward blocks.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        depth: int,
+        heads: int,
+        dim_head: int,
+        mlp_dim: int,
+        attention_layer: Optional[Callable] = None,
+    ):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
         self.layers = nn.ModuleList([])
-        for _ in range(depth):
-            self.layers.append(
-                nn.ModuleList([Attention(dim, heads=heads, dim_head=dim_head), FeedForward(dim, mlp_dim)])
-            )
 
-    def forward(self, x):
+        # Use passed attention layer factory or default to standard Attention
+        create_attn = attention_layer if attention_layer is not None else partial(Attention, dim_head=dim_head)
+
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([create_attn(dim=dim, heads=heads), FeedForward(dim, mlp_dim)]))
+
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         for attn, ff in self.layers:
-            x = attn(x) + x
+            x = attn(x, mask=mask) + x
             x = ff(x) + x
         return self.norm(x)
 
 
 class SimpleViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, channels=3, dim_head=64):
+    """
+    Simple Vision Transformer implementation.
+    """
+
+    def __init__(
+        self,
+        *,
+        image_size: Union[int, Tuple[int, int]],
+        patch_size: Union[int, Tuple[int, int]],
+        num_classes: int,
+        dim: int,
+        depth: int,
+        heads: int,
+        mlp_dim: int,
+        channels: int = 3,
+        dim_head: int = 64,
+        attention_layer: Optional[Callable] = None,
+    ):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
 
-        assert (
-            image_height % patch_height == 0 and image_width % patch_width == 0
-        ), "Image dimensions must be divisible by the patch size."
+        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
 
         patch_dim = channels * patch_height * patch_width
 
@@ -111,7 +147,7 @@ class SimpleViT(nn.Module):
             dim=dim,
         )
 
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim)
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, attention_layer)
 
         self.pool = "mean"
         self.to_latent = nn.Identity()

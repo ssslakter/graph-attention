@@ -1,0 +1,5 @@
+# @package _group_
+_target_: graph_attention.models.simple_vit.Attention
+_partial_: true
+dim_head: 64
+heads: 8

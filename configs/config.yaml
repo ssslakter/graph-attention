@@ -9,6 +9,7 @@ defaults:
 run: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 training:
+  seed: 42
   epochs: 30
   use_amp: true
   amp_dtype: float16
@@ -33,7 +34,7 @@ hooks:
     enabled: true
     _target_: graph_attention.hooks.AccuracyMetricsHook
     verbose: true
-    tracker_type: null  # 'wandb', 'trackio' or null
+    tracker_type: trackio  # 'wandb', 'trackio' or null
     project: graph-attention
     name: ${run}
 

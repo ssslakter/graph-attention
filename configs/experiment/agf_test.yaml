@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - override /model/layers@model.attention_layer: agf
+  - override /model/layers/estimator@model.attention_layer.graph_estimator: attention
+  - override /model/layers/filter@model.attention_layer.graph_filter: polynomial
+
+model:
+  attention_layer:
+    graph_estimator:
+      k_neighbors: 128
+    graph_filter:
+      order_K: 2
+
