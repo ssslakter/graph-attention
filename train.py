@@ -1,12 +1,11 @@
-import hydra
-import logging
-import torch
+import hydra, logging, json, torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
 from graph_attention.data.cifar import get_cifar, get_transforms
+from graph_attention.training.trainer import GraphAttentionTrainer
 
 log = logging.getLogger(__name__)
 
@@ -70,11 +69,12 @@ def build_hooks(hook_cfg: DictConfig, config: DictConfig = None):
         return hooks
 
     for name, h_cfg in hook_cfg.items():
-        if not h_cfg.get("enabled", False): continue
+        if not h_cfg.get("enabled", False):
+            continue
         h_cfg = {k: v for k, v in OmegaConf.to_container(h_cfg, resolve=True).items() if k != "enabled"}
         if name == "metrics" and config is not None:
-            h_cfg["config"] = OmegaConf.to_container(remove_disabled_hooks(config), resolve=True)
-        hooks.append(instantiate(h_cfg, _recursive_=False))
+            h_cfg["config"] = json.dumps(OmegaConf.to_container(remove_disabled_hooks(config), resolve=True))
+        hooks.append(instantiate(h_cfg, _recursive_=True))
     return hooks
 
 
@@ -98,9 +98,13 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
         hooks.append(GradClipHook(max_norm=cfg.training.grad_clip))
 
 
-def build_trainer(model, train_dl, valid_dl, optimizer, hooks, device, cfg):
+def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
     """Build the trainer instance."""
-    return BaseTrainer(
+    trainer_cls = Trainer
+    if cfg.model.get("attention_layer") and "agf" in cfg.model.attention_layer.get("_target_", "").lower():
+        trainer_cls = GraphAttentionTrainer
+
+    return trainer_cls(
         model=model,
         train_dl=train_dl,
         valid_dl=valid_dl,
@@ -132,7 +136,6 @@ def main(cfg: DictConfig):
         valid_dl=test_dataloader,
         optimizer=optimizer,
         hooks=hooks,
-        device=cfg.training.device,
         cfg=cfg,
     )
     log.info(f"Using trainer: {type(trainer).__name__}")

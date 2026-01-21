@@ -17,7 +17,14 @@ class AGFLayer(nn.Module):
     4. Heads concatenated and projected via Output Linear.
     """
 
-    def __init__(self, heads: int, dim: int, graph_estimator: Union[GraphEstimator, Callable], graph_filter: Union[GraphFilter, Callable], **kwargs):
+    def __init__(
+        self,
+        heads: int,
+        dim: int,
+        graph_estimator: Union[GraphEstimator, Callable],
+        graph_filter: Union[GraphFilter, Callable],
+        **kwargs,
+    ):
         super().__init__()
         self.num_heads = heads
         self.head_dim = dim // heads
@@ -43,6 +50,8 @@ class AGFLayer(nn.Module):
         # Returns (B, H, N, N)
         adj_matrix = self.graph_estimator(x, mask)
 
+        self.last_adj = adj_matrix
+        self.last_x = x
         # 2. Project Values and Reshape
         # (B, N, D) -> (B, N, H, D_h) -> (B, H, N, D_h)
         v = self.W_V(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
@@ -57,3 +66,25 @@ class AGFLayer(nn.Module):
 
         # 5. Final Output Projection
         return self.W_O(v_merged)
+
+    def get_regularization_loss(self, lambda_smooth: float = 0.01) -> torch.Tensor:
+        """
+        Computes the spectral smoothness loss for this specific layer.
+        (Minimizes Dirichlet Energy).
+        """
+        if self.last_adj is None or self.last_x is None:
+            return torch.tensor(0.0, device=self.W_O.weight.device)
+
+        A = self.last_adj.float()
+        X = self.last_x.detach().float()
+
+        X_norm = torch.nn.functional.normalize(X, p=2, dim=-1)
+
+        smoothness = torch.einsum("bnd,bhnm,bmd->", X_norm, A, X_norm)
+
+        B, H, N, _ = A.shape
+        normalization = B * H * N
+
+        loss = -1.0 * (smoothness / normalization)
+
+        return loss * lambda_smooth

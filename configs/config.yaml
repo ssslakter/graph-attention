@@ -11,7 +11,7 @@ run: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 training:
   seed: 42
   epochs: 30
-  use_amp: true
+  use_amp: false
   amp_dtype: float16
   device: cuda
   grad_clip: 1.0
@@ -32,11 +32,16 @@ hooks:
   
   metrics:
     enabled: true
-    _target_: graph_attention.hooks.AccuracyMetricsHook
-    verbose: true
+    _target_: trainer_tools.hooks.MetricsHook
+    verbose: false
     tracker_type: trackio  # 'wandb', 'trackio' or null
     project: graph-attention
     name: ${run}
+    metrics:
+      - _target_: graph_attention.training.metrics.LayerActivationStats
+        freq: 1
+      - _target_: trainer_tools.metrics.Loss
+      - _target_: trainer_tools.metrics.Accuracy
 
 # Hydra configuration
 hydra:
