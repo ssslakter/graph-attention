@@ -1,6 +1,6 @@
 import hydra, logging, json, torch
 from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
@@ -112,6 +112,7 @@ def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
         loss_func=torch.nn.CrossEntropyLoss(label_smoothing=0.1),
         epochs=cfg.training.epochs,
         hooks=[h for h in hooks if h],
+        config=cfg
     )
 
 
@@ -122,7 +123,9 @@ def main(cfg: DictConfig):
     random_seed(cfg.training.seed)
     log.info(f"Random seed set to {cfg.training.seed}")
     train_dataloader, test_dataloader = _build_datasets_and_loaders(cfg)
-    model = instantiate(cfg.model, channels=cfg.dataset.channels, num_classes=len(train_dataloader.dataset.classes))
+    with open_dict(cfg):
+        cfg.model.num_classes = len(train_dataloader.dataset.classes)
+    model = instantiate(cfg.model, channels=cfg.dataset.channels, num_classes=cfg.model.num_classes)
     optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
 
     hooks = build_hooks(cfg.hooks, config=cfg)

@@ -17,13 +17,15 @@ DATASET_STATS = {
     }
 }
 
-def get_transforms(variant: str, train: bool = True, augmentation: str = "standard") -> tfm.Compose:
+def get_transforms(variant: str, train: bool = True, augmentation: str = "standard", normalize: bool = True) -> tfm.Compose:
     stats = DATASET_STATS.get(variant)
     if not stats:
         raise ValueError(f"Unknown variant: {variant}")
 
+    normalization = [tfm.Normalize(stats["mean"], stats["std"])] if normalize else []
+
     if not train:
-        return tfm.Compose([tfm.ToTensor(), tfm.Normalize(stats["mean"], stats["std"])])
+        return tfm.Compose([tfm.ToTensor()] + normalization)
 
     aug_strategies = {
         "none": [],
@@ -34,7 +36,7 @@ def get_transforms(variant: str, train: bool = True, augmentation: str = "standa
     if augmentation not in aug_strategies:
         raise ValueError(f"Unknown augmentation: {augmentation}")
 
-    transforms = aug_strategies[augmentation] + [tfm.ToTensor(), tfm.Normalize(stats["mean"], stats["std"])]
+    transforms = aug_strategies[augmentation] + [tfm.ToTensor()] + normalization
     return tfm.Compose(transforms)
 
 def get_cifar(
@@ -42,14 +44,18 @@ def get_cifar(
     train: bool = True,
     transforms: Optional[Union[List, Callable, tfm.Compose]] = None,
     variant: Literal["cifar10", "cifar100"] = "cifar10",
+    normalize: bool = True,
 ) -> Dataset:
     stats = DATASET_STATS.get(variant)
     if not stats:
         raise ValueError(f"Unknown variant: {variant}")
     
     if transforms is None:
-        transforms = get_transforms(variant, train=train)
+        transforms = get_transforms(variant, train=train, normalize=normalize)
     elif isinstance(transforms, list):
-        transforms = tfm.Compose(transforms + [tfm.Normalize(stats["mean"], stats["std"])])
+        if not any(isinstance(t, tfm.ToTensor) for t in transforms):
+            transforms = transforms + [tfm.ToTensor()]
+        normalization = [tfm.Normalize(stats["mean"], stats["std"])] if normalize else []
+        transforms = tfm.Compose(transforms + normalization)
 
     return stats["cls"](root=root, train=train, download=True, transform=transforms)

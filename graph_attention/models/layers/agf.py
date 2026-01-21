@@ -32,9 +32,9 @@ class AGFLayer(nn.Module):
 
         # Handle instantiation if factory/partial is passed
         if callable(graph_estimator):
-            self.graph_estimator = graph_estimator(dim=dim, num_heads=heads, dim_head=dim_head)
+            self.attend = graph_estimator(dim=dim, num_heads=heads, dim_head=dim_head)
         else:
-            self.graph_estimator = graph_estimator
+            self.attend = graph_estimator
 
         if callable(graph_filter):
             self.graph_filter = graph_filter(num_heads=heads)
@@ -49,13 +49,13 @@ class AGFLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, num_nodes, _ = x.shape
-        adj_matrix = self.graph_estimator(x, mask)
+        attn = self.attend(x, mask)
 
-        self.last_adj = adj_matrix
+        self.last_adj = attn
         self.last_input = x
 
         values = self.to_v(x).view(batch_size, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
-        values_filtered = self.graph_filter(adj_matrix, values)
+        values_filtered = self.graph_filter(attn, values)
         values_merged = values_filtered.transpose(1, 2).contiguous().view(batch_size, num_nodes, -1)
         return self.to_out(values_merged)
 
