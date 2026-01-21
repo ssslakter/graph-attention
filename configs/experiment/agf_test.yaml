@@ -10,5 +10,5 @@ model:
     graph_estimator:
       k_neighbors: 128
     graph_filter:
-      order_K: 2
+      order: 2
 

@@ -73,7 +73,7 @@ class Attention(nn.Module):
 
         out = torch.matmul(attn, v)
         out = rearrange(out, "b h n d -> b n (h d)")
-        return self.to_out(out)
+        return self.to_out(out) + x
 
 
 class Transformer(nn.Module):
@@ -98,11 +98,13 @@ class Transformer(nn.Module):
         create_attn = attention_layer if attention_layer is not None else partial(Attention, dim_head=dim_head)
 
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([create_attn(dim=dim, heads=heads), FeedForward(dim, mlp_dim)]))
+            self.layers.append(
+                nn.ModuleList([create_attn(dim=dim, heads=heads, dim_head=dim_head), FeedForward(dim, mlp_dim)])
+            )
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         for attn, ff in self.layers:
-            x = attn(x, mask=mask) + x
+            x = attn(x, mask=mask)
             x = ff(x) + x
         return self.norm(x)
 
@@ -130,7 +132,9 @@ class SimpleViT(nn.Module):
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
 
-        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
+        assert (
+            image_height % patch_height == 0 and image_width % patch_width == 0
+        ), "Image dimensions must be divisible by the patch size."
 
         patch_dim = channels * patch_height * patch_width
 

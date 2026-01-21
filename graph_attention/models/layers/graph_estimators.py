@@ -36,36 +36,31 @@ class AttentionStyleEstimator(GraphEstimator):
         Q, K -> Split Heads -> Scaled Dot Product -> TopK Sparsity -> Softmax
     """
 
-    def __init__(self, dim: int, num_heads: int, k_neighbors: int):
+    def __init__(self, dim: int, num_heads: int, dim_head: int, k_neighbors: int):
         super().__init__()
-        assert dim % num_heads == 0, "Dim must be divisible by num_heads"
-
         self.num_heads = num_heads
-        self.head_dim = dim // num_heads
-        self.k = k_neighbors
-        self.scale = self.head_dim**-0.5
+        self.dim_head = dim_head
+        self.scale = dim_head**-0.5
+        self.k_neighbors = k_neighbors
+
+        inner_dim = dim_head * num_heads
 
         # Projections to [Batch, Seq, Num_Heads * Head_Dim]
-        self.W_Q = nn.Linear(dim, dim)
-        self.W_K = nn.Linear(dim, dim)
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(dim, inner_dim, bias=False)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        B, N, _ = x.shape
+        bs, num_nodes, _ = x.shape
+        query = self.to_q(x).view(bs, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
+        key = self.to_k(x).view(bs, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
 
-        # 1. Project and Reshape to (B, Heads, N, Head_Dim)
-        q = self.W_Q(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.W_K(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
-
-        # 2. Compute Scores: (B, H, N, D) @ (B, H, D, N) -> (B, H, N, N)
-        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale
 
         if mask is not None:
-            # Mask shape usually (B, 1, 1, N) or (B, 1, N, N) for broadcasting
             scores = scores.masked_fill(mask == 0, float("-inf"))
 
-        # 3. Apply Sparsity per head
-        if self.k < N:
-            top_k_vals, _ = torch.topk(scores, self.k, dim=-1)
+        if self.k_neighbors < num_nodes:
+            top_k_vals, _ = torch.topk(scores, self.k_neighbors, dim=-1)
             min_k = top_k_vals[..., -1].unsqueeze(-1)
             scores = torch.where(scores < min_k, torch.tensor(float("-inf"), device=x.device), scores)
 

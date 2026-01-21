@@ -1,4 +1,4 @@
 # @package _group_
 _target_: graph_attention.models.layers.graph_filters.PolynomialFilter
 _partial_: true
-order_K: 3
+order: 3

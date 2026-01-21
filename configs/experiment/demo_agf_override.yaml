@@ -21,4 +21,4 @@ model:
     graph_estimator:
       k_neighbors: 16  # Change sparsity
     graph_filter:
-      order_K: 5       # Change polynomial order
+      order: 5       # Change polynomial order

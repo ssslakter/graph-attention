@@ -10,7 +10,7 @@ class GraphFilter(nn.Module, ABC):
     """
     Abstract strategy for propagating information across the graph.
 
-    This encapsulates the 'Graph Filtering' phase (Section 4.2),
+    This encapsulates the 'Graph Filtering' phase,
     handling multi-hop aggregation or spectral filtering.
     """
 
@@ -18,11 +18,11 @@ class GraphFilter(nn.Module, ABC):
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            adj: Adjacency Matrix (Batch, Seq_Len, Seq_Len)
-            x: Node Features (Batch, Seq_Len, Dim)
+            adj: Adjacency Matrix (Batch, Heads, Num_Nodes, Num_Nodes)
+            x: Node Features (Batch, Heads, Num_Nodes, Dim)
 
         Returns:
-            Filtered Features (Batch, Seq_Len, Dim)
+            Filtered Features (Batch, Heads, Num_Nodes, Dim)
         """
         pass
 
@@ -35,28 +35,28 @@ class PolynomialFilter(GraphFilter):
     filtering characteristics (smoothing vs sharpening) in different subspaces.
     """
 
-    def __init__(self, order_K: int, num_heads: int):
+    def __init__(self, order: int, num_heads: int):
         super().__init__()
-        self.K = order_K
+        self.order = order
 
-        self.alphas = nn.Parameter(torch.zeros(order_K + 1, 1, num_heads, 1, 1))
+        self.alphas = nn.Parameter(torch.zeros(order + 1, 1, num_heads, 1, 1))
         nn.init.normal_(self.alphas, std=0.01)
         with torch.no_grad():
-             self.alphas[1] += 1.0
+            self.alphas[0] += 1.0
+            self.alphas[1] += 1.0
 
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        # adj: (B, H, N, N)
-        # x (Values): (B, H, N, Head_Dim)
-        with torch.autocast(device_type='cuda', enabled=False):
+        # adj: (bs, heads, seq_len, seq_len)
+        # x: (bs, heads, seq_len, dim_head)
+        with torch.autocast(device_type="cuda", enabled=False):
             adj = adj.float()
             x = x.float()
-            
+
             alphas = self.alphas.float()
             output = alphas[0] * x
             current_x = x
 
-            for k in range(1, self.K + 1):
-                # A @ X performs batch matmul over (N, N) @ (N, D)
+            for k in range(1, self.order + 1):
                 current_x = torch.matmul(adj, current_x)
                 output = output + alphas[k] * current_x
 
