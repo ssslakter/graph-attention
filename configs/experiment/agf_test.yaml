@@ -1,9 +1,16 @@
 # @package _global_
 
 defaults:
+  - override /model: vit_base
+  - override /dataset: cifar10
+  - override /optimizer: adamw
+  - override /scheduler: onecycle
   - override /model/layers@model.attention_layer: agf
   - override /model/layers/estimator@model.attention_layer.graph_estimator: attention
   - override /model/layers/filter@model.attention_layer.graph_filter: polynomial
+
+optimizer:
+  lr: 0.001
 
 model:
   attention_layer:
@@ -13,5 +20,11 @@ model:
       order: 2
       basis: monomial
 
-scheduler: null
-run: ${model.attention_layer.graph_filter.basis}_k${model.attention_layer.graph_estimator.k_neighbors}_o${model.attention_layer.graph_filter.order}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+training:
+  epochs: 30
+  use_amp: true
+
+attn: ${model.attention_layer}
+prefix: ${attn.graph_filter.basis}_k${attn.graph_estimator.k_neighbors}_o${attn.graph_filter.order}
+suffix: ${now:%H-%M-%S}
+run: ${prefix}/${now:%Y-%m-%d}/${suffix}
