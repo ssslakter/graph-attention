@@ -35,29 +35,40 @@ class PolynomialFilter(GraphFilter):
     filtering characteristics (smoothing vs sharpening) in different subspaces.
     """
 
-    def __init__(self, order: int, num_heads: int):
+    def __init__(self, order: int, num_heads: int, basis: str = "chebyshev"):
         super().__init__()
         self.order = order
+        self.basis = basis.lower()
+        if self.basis not in ["monomial", "chebyshev"]:
+            raise ValueError(f"Unknown basis: {basis}")
 
         self.alphas = nn.Parameter(torch.zeros(order + 1, 1, num_heads, 1, 1))
-        nn.init.normal_(self.alphas, std=0.01)
         with torch.no_grad():
-            self.alphas[0] += 1.0
-            self.alphas[1] += 1.0
+            self.alphas[0].fill_(1.0)
+            self.alphas[1:].normal_(0, 0.01)
 
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        # adj: (bs, heads, seq_len, seq_len)
-        # x: (bs, heads, seq_len, dim_head)
         with torch.autocast(device_type="cuda", enabled=False):
-            adj = adj.float()
-            x = x.float()
+            adj, x, alphas = adj.float(), x.float(), self.alphas.float()
+            alphas = torch.tanh(alphas)
 
-            alphas = self.alphas.float()
-            output = alphas[0] * x
-            current_x = x
+            if self.basis == "monomial":
+                out, curr = alphas[0] * x, x
+                for k in range(1, self.order + 1):
+                    curr = torch.matmul(adj, curr)
+                    out = out + alphas[k] * curr
+                return out
 
-            for k in range(1, self.order + 1):
-                current_x = torch.matmul(adj, current_x)
-                output = output + alphas[k] * current_x
+            t_prev = x
+            out = alphas[0] * t_prev
 
-            return output
+            if self.order > 0:
+                t_curr = torch.matmul(adj, x)
+                out = out + alphas[1] * t_curr
+
+                for k in range(2, self.order + 1):
+                    t_next = 2 * torch.matmul(adj, t_curr) - t_prev
+                    out = out + alphas[k] * t_next
+                    t_prev, t_curr = t_curr, t_next
+
+            return out
