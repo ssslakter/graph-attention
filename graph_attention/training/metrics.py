@@ -27,19 +27,16 @@ class LayerActivationStats(Metric):
             x_out = out
 
             with torch.no_grad():
-                prefix = f"debug/{name}"
-                
                 # Signal Norms & Gain
                 in_norm = x_in.norm(p=2, dim=-1).mean().item()
                 out_norm = x_out.norm(p=2, dim=-1).mean().item()
                 
-                self._stats[f"{prefix}/in_norm"] = in_norm
-                self._stats[f"{prefix}/out_norm"] = out_norm
-                self._stats[f"{prefix}/gain"] = out_norm / (in_norm + 1e-6)
+                self._stats[f"debug/norms/{name}/in_norm"] = in_norm
+                self._stats[f"debug/norms/{name}/out_norm"] = out_norm
+                self._stats[f"debug/norms/{name}/gain"] = out_norm / (in_norm + 1e-6)
 
                 if (adj := getattr(module, "last_adj", None)) is not None:
-                    self._stats[f"{prefix}/adj_mean"] = adj.mean().item()
-                    self._stats[f"{prefix}/adj_max"] = adj.max().item()
+                    self._stats[f"debug/details/{name}/adj_max"] = adj.max().item()
 
                 # Alpha coefficients from Graph Filter (e.g., PolynomialFilter)
                 graph_filter = getattr(module, "graph_filter", None)
@@ -50,18 +47,18 @@ class LayerActivationStats(Metric):
                     # Per-degree summaries and per-head values
                     for k in range(a_vals.shape[0]):
                         k_vals = a_vals[k]  # (H,)
-                        self._stats[f"{prefix}/alpha_{k}/mean"] = k_vals.mean().item()
-                        self._stats[f"{prefix}/alpha_{k}/max"] = k_vals.max().item()
+                        self._stats[f"debug/alphas/{name}/alpha_{k}/mean"] = k_vals.mean().item()
+                        self._stats[f"debug/alphas/{name}/alpha_{k}/max"] = k_vals.max().item()
                         for h in range(k_vals.shape[0]):
-                            self._stats[f"{prefix}/alpha_{k}/h{h:02d}"] = k_vals[h].item()
+                           self._stats[f"debug/alphas/{name}/alpha_{k}/h{h:02d}"] = k_vals[h].item()
 
                     # If gradients are available, log their summaries too
                     if getattr(alphas, "grad", None) is not None:
                         g_vals = alphas.grad.detach().float().squeeze(-1).squeeze(-1).squeeze(1).abs()
                         for k in range(g_vals.shape[0]):
                             k_grads = g_vals[k]  # (H,)
-                            self._stats[f"{prefix}/alpha_grad_{k}/mean"] = k_grads.mean().item()
-                            self._stats[f"{prefix}/alpha_grad_{k}/max"] = k_grads.max().item()
+                            self._stats[f"debug/alphas/{name}/alpha_grad_{k}/mean"] = k_grads.mean().item()
+                            self._stats[f"debug/alphas/{name}/alpha_grad_{k}/max"] = k_grads.max().item()
         return hook
 
     def _register(self, model):

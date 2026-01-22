@@ -73,7 +73,7 @@ class Attention(nn.Module):
 
         out = torch.matmul(attn, v)
         out = rearrange(out, "b h n d -> b n (h d)")
-        return self.to_out(out) + x
+        return self.to_out(out)
 
 
 class Transformer(nn.Module):
@@ -104,7 +104,7 @@ class Transformer(nn.Module):
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         for attn, ff in self.layers:
-            x = attn(x, mask=mask)
+            x = attn(x, mask=mask) + x
             x = ff(x) + x
         return self.norm(x)
 

@@ -50,16 +50,15 @@ class AttentionStyleEstimator(GraphEstimator):
         self.to_k = nn.Linear(dim, inner_dim, bias=False)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        bs, num_nodes, _ = x.shape
-        query = self.to_q(x).view(bs, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
-        key = self.to_k(x).view(bs, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
-
-        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale
+        bs, n, _ = x.shape
+        q = self.to_q(x).view(bs, n, self.num_heads, self.dim_head).transpose(1, 2)
+        k = self.to_k(x).view(bs, n, self.num_heads, self.dim_head).transpose(1, 2)
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
 
         if mask is not None:
             scores = scores.masked_fill(mask == 0, float("-inf"))
 
-        if self.k_neighbors < num_nodes:
+        if self.k_neighbors < n:
             top_k_vals, _ = torch.topk(scores, self.k_neighbors, dim=-1)
             min_k = top_k_vals[..., -1].unsqueeze(-1)
             scores = torch.where(scores < min_k, torch.tensor(float("-inf"), device=x.device), scores)

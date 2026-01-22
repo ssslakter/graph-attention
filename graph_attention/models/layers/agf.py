@@ -30,31 +30,31 @@ class AGFLayer(nn.Module):
         self.dim_head = dim_head
         inner_dim = dim_head * heads
 
-        # Handle instantiation if factory/partial is passed
-        if callable(graph_estimator):
-            self.attend = graph_estimator(dim=dim, num_heads=heads, dim_head=dim_head)
-        else:
-            self.attend = graph_estimator
-
-        if callable(graph_filter):
-            self.graph_filter = graph_filter(num_heads=heads)
-        else:
-            self.graph_filter = graph_filter
+        # Factories
+        self.attend = graph_estimator(dim=dim, num_heads=heads, dim_head=dim_head) if callable(graph_estimator) else graph_estimator
+        self.graph_filter = graph_filter(num_heads=heads) if callable(graph_filter) else graph_filter
 
         self.to_v = nn.Linear(dim, inner_dim, bias=False)
         self.to_out = nn.Linear(inner_dim, dim, bias=False)
+        
+        self.norm_v = nn.LayerNorm(dim_head) 
 
         self.last_adj = None
         self.last_input = None
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, num_nodes, _ = x.shape
+        
         attn = self.attend(x, mask)
-
         self.last_adj = attn
         self.last_input = x
 
-        values = self.to_v(x).view(batch_size, num_nodes, self.num_heads, self.dim_head).transpose(1, 2)
+        # (B, N, H*D) -> (B, N, H, D)
+        values = self.to_v(x).view(batch_size, num_nodes, self.num_heads, self.dim_head)
+        values = self.norm_v(values)
+        # Transpose for filter: (B, H, N, D)
+        values = values.transpose(1, 2)
+
         values_filtered = self.graph_filter(attn, values)
         values_merged = values_filtered.transpose(1, 2).contiguous().view(batch_size, num_nodes, -1)
         return self.to_out(values_merged)

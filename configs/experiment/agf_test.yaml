@@ -11,4 +11,7 @@ model:
       k_neighbors: 128
     graph_filter:
       order: 2
+      basis: monomial
 
+scheduler: null
+run: ${model.attention_layer.graph_filter.basis}_k${model.attention_layer.graph_estimator.k_neighbors}_o${model.attention_layer.graph_filter.order}/${now:%Y-%m-%d}/${now:%H-%M-%S}

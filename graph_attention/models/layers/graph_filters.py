@@ -35,22 +35,20 @@ class PolynomialFilter(GraphFilter):
     filtering characteristics (smoothing vs sharpening) in different subspaces.
     """
 
-    def __init__(self, order: int, num_heads: int, basis: str = "chebyshev"):
+    def __init__(self, order: int, num_heads: int, basis: str = "monomial"):
         super().__init__()
         self.order = order
         self.basis = basis.lower()
-        if self.basis not in ["monomial", "chebyshev"]:
-            raise ValueError(f"Unknown basis: {basis}")
+        self.alpha_raw = nn.Parameter(torch.randn(order + 1, 1, num_heads, 1, 1) * 1e-2)
 
-        self.alphas = nn.Parameter(torch.zeros(order + 1, 1, num_heads, 1, 1))
-        with torch.no_grad():
-            self.alphas[0].fill_(1.0)
-            self.alphas[1:].normal_(0, 0.01)
+    @property
+    def alphas(self):
+        return torch.tanh(self.alpha_raw)
 
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         with torch.autocast(device_type="cuda", enabled=False):
             adj, x, alphas = adj.float(), x.float(), self.alphas.float()
-            alphas = torch.tanh(alphas)
+            alphas = alphas
 
             if self.basis == "monomial":
                 out, curr = alphas[0] * x, x
@@ -59,15 +57,23 @@ class PolynomialFilter(GraphFilter):
                     out = out + alphas[k] * curr
                 return out
 
+            # --- Chebyshev Basis ---
             t_prev = x
             out = alphas[0] * t_prev
 
             if self.order > 0:
-                t_curr = torch.matmul(adj, x)
+                # T_1(x) = (2A - I)x = 2(Ax) - x
+                t_curr = 2 * torch.matmul(adj, x) - x
                 out = out + alphas[1] * t_curr
 
+                # Recurrence: T_k = 2 * L_tilde * T_{k-1} - T_{k-2}
                 for k in range(2, self.order + 1):
-                    t_next = 2 * torch.matmul(adj, t_curr) - t_prev
+                    # Compute L_tilde @ T_curr = 2(A @ T_curr) - T_curr
+                    a_t_curr = torch.matmul(adj, t_curr)
+                    l_tilde_t_curr = 2 * a_t_curr - t_curr
+
+                    t_next = 2 * l_tilde_t_curr - t_prev
+
                     out = out + alphas[k] * t_next
                     t_prev, t_curr = t_curr, t_next
 
