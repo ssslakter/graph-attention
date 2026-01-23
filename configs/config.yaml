@@ -1,7 +1,6 @@
 defaults:
   - model: vit_base
   - dataset: cifar10
-  - dataloader: default
   - optimizer: adamw
   - scheduler: onecycle
   - _self_

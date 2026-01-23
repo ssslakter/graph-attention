@@ -25,6 +25,6 @@ training:
   use_amp: true
 
 attn: ${model.attention_layer}
-prefix: ${attn.graph_filter.basis}_k${attn.graph_estimator.k_neighbors}_o${attn.graph_filter.order}
+prefix: ${attn.graph_filter.basis}_o${attn.graph_filter.order}
 suffix: ${now:%H-%M-%S}
 run: ${prefix}/${now:%Y-%m-%d}/${suffix}

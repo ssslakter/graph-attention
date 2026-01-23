@@ -35,11 +35,11 @@ class PolynomialFilter(GraphFilter):
     filtering characteristics (smoothing vs sharpening) in different subspaces.
     """
 
-    def __init__(self, order: int, num_heads: int, basis: str = "monomial"):
+    def __init__(self, order: int, num_heads: int, basis: str = "monomial", init_std: float = 0.1):
         super().__init__()
         self.order = order
         self.basis = basis.lower()
-        self.alpha_raw = nn.Parameter(torch.randn(order + 1, num_heads) * 1e-1)
+        self.alpha_raw = nn.Parameter(torch.randn(order + 1, num_heads) * init_std)
 
     @property
     def alphas(self):
