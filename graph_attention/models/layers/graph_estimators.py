@@ -36,7 +36,7 @@ class AttentionStyleEstimator(GraphEstimator):
         Q, K -> Split Heads -> Scaled Dot Product -> TopK Sparsity -> Softmax
     """
 
-    def __init__(self, dim: int, num_heads: int, dim_head: int, k_neighbors: int):
+    def __init__(self, dim: int, num_heads: int, dim_head: int, k_neighbors: Optional[int] = None):
         super().__init__()
         self.num_heads = num_heads
         self.dim_head = dim_head
@@ -58,7 +58,7 @@ class AttentionStyleEstimator(GraphEstimator):
         if mask is not None:
             scores = scores.masked_fill(mask == 0, float("-inf"))
 
-        if self.k_neighbors < n:
+        if self.k_neighbors is not None and self.k_neighbors < n:
             top_k_vals, _ = torch.topk(scores, self.k_neighbors, dim=-1)
             min_k = top_k_vals[..., -1].unsqueeze(-1)
             scores = torch.where(scores < min_k, torch.tensor(float("-inf"), device=x.device), scores)

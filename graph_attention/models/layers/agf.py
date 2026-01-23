@@ -6,7 +6,7 @@ from .graph_estimators import GraphEstimator
 from .graph_filters import GraphFilter
 
 
-class AGFLayer(nn.Module):
+class AGFAttention(nn.Module):
     """
     Adaptive Graph Filtering Layer with OV Circuit and Multi-Head support.
 
@@ -80,3 +80,5 @@ class AGFLayer(nn.Module):
         loss = -1.0 * (smoothness / normalization)
 
         return loss * lambda_smooth
+
+AGFLayer = AGFAttention # Alias for backward compatibility

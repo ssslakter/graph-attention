@@ -39,7 +39,7 @@ class PolynomialFilter(GraphFilter):
         super().__init__()
         self.order = order
         self.basis = basis.lower()
-        self.alpha_raw = nn.Parameter(torch.randn(order + 1, 1, num_heads, 1, 1) * 1e-2)
+        self.alpha_raw = nn.Parameter(torch.randn(order + 1, num_heads) * 1e-1)
 
     @property
     def alphas(self):
@@ -48,7 +48,7 @@ class PolynomialFilter(GraphFilter):
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         with torch.autocast(device_type="cuda", enabled=False):
             adj, x, alphas = adj.float(), x.float(), self.alphas.float()
-            alphas = alphas
+            alphas = alphas[:, None, :, None, None]
 
             if self.basis == "monomial":
                 out, curr = alphas[0] * x, x

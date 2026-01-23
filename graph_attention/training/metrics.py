@@ -1,6 +1,6 @@
 import torch
 from trainer_tools.metrics import Metric
-from ..models.layers.agf import AGFLayer
+from ..models.layers.agf import AGFAttention
 
 
 class LayerActivationStats(Metric):
@@ -11,7 +11,7 @@ class LayerActivationStats(Metric):
         layer_cls: The class type of the layers to monitor (e.g., AGFLayer).
         freq: How often to log the stats (default: 1).
     """
-    def __init__(self, layer_cls = AGFLayer, freq: int = 1):
+    def __init__(self, layer_cls = AGFAttention, freq: int = 1):
         # We collect this 'after_loss' to ensure the forward pass is complete
         super().__init__("layer_stats", freq, phase="after_loss", use_prefix=False)
         self.layer_cls = layer_cls

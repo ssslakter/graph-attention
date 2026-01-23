@@ -8,6 +8,13 @@ defaults:
 
 run: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 
+dataloader:
+  batch_size: 128
+  valid_batch_size: 256
+  num_workers: 6
+  persistent_workers: true
+  pin_memory: true
+
 training:
   seed: 42
   epochs: 30
