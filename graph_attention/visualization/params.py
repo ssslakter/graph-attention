@@ -13,42 +13,50 @@ def _get_graph_filters(model: nn.Module) -> list[PolynomialFilter]:
 def plot_alphas(model: nn.Module, width: int = None, height: int = 600):
     "Plot alpha weights per head/layer with clean formatting and LaTeX support"
     layers = _get_graph_filters(model)
-    # [heads, layers, alphas]
-    alphas = torch.stack([l.alphas.detach().cpu() for l in layers]).permute(2, 0, 1)
-    nh, nl, na = alphas.shape
-    
-    # Ensure minimum 80px per alpha column to prevent text overlap
-    width = width or max(800, nh * na * 80)
+    # each layer's alphas: [alphas, heads]
+    alphas = torch.stack([l.alphas.detach().cpu() for l in layers])  # [layers, alphas, heads]
+    nl, na, nh = alphas.shape
 
-    fig = make_subplots(1, nh, subplot_titles=[f"<b>Head {i}</b>" for i in range(nh)], 
+    # Make plot less wide, especially for few alphas
+    # Use a lower minimum and scale by layers and alphas (not heads)
+    width = width or max(500, nl * max(na * 60, 200))
+
+    fig = make_subplots(1, nl, subplot_titles=[f"<b>Layer {i}</b>" for i in range(nl)], 
                         horizontal_spacing=0.05)
 
     for i, data in enumerate(alphas):
+        # data: [alphas, heads] for layer i
+        # We want: y-axis = heads (top to bottom), x-axis = alphas (left to right)
         fig.add_trace(go.Heatmap(
-            z=data, coloraxis="coloraxis",
-            text=data, texttemplate="%{z:.2f}", # Forces 2 decimal places in cells
+            z=data.T,  # shape: [heads, alphas]
+            coloraxis="coloraxis",
+            text=data.T, texttemplate="%{z:.2f}",
             textfont={"size": 10},
-            hovertemplate="Layer: %{y}<br>Alpha: %{x}<br>Val: %{z:.4f}<extra></extra>"
+            hovertemplate="Head: %{y}<br>Alpha: %{x}<br>Val: %{z:.4f}<extra></extra>"
         ), 1, i+1)
 
     fig.update_layout(
         width=width, height=height, 
-        margin=dict(t=150, b=50, l=100, r=50), # Large top margin for titles + labels
+        margin=dict(t=150, b=50, l=100, r=50),
         coloraxis=dict(colorscale="RdBu_r", cmid=0, colorbar_title="Magnitude")
     )
 
-    # side="top" moves labels up; tickangle=0 prevents the slanted overlap
-    fig.update_xaxes(
-        tickvals=list(range(na)), 
-        ticktext=[f"a{j}" for j in range(na)], 
-        side="top", tickangle=0
-    )
-    
-    # autorange="reversed" puts Layer 0 at the top
-    fig.update_yaxes(autorange="reversed", tickvals=list(range(nl)))
-    fig.update_yaxes(title_text="Layer", col=1)
+    # x-axis: alphas
+    for i in range(nl):
+        fig.update_xaxes(
+            tickvals=list(range(na)), 
+            ticktext=[f"a{j}" for j in range(na)], 
+            side="top", tickangle=0, col=i+1
+        )
+    # y-axis: heads (top to bottom)
+    for i in range(nl):
+        fig.update_yaxes(
+            autorange="reversed", tickvals=list(range(nh)), 
+            ticktext=[f"h{j}" for j in range(nh)], 
+            title_text="Head" if i == 0 else None, col=i+1
+        )
 
-    # Move 'Head X' titles higher so they don't crash into alpha labels
+    # Move 'Layer X' titles higher so they don't crash into head labels
     for ann in fig.layout.annotations: ann.update(y=1.12, font_size=14)
 
     fig.show(include_mathjax='cdn')

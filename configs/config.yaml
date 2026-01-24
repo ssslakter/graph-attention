@@ -54,7 +54,7 @@ hydra:
   run:
     dir: outputs/${run}
   sweep:
-    dir: multirun/${run}
+    dir: outputs/multirun/${run}
     subdir: ${hydra.job.num}
   job:
     chdir: false
