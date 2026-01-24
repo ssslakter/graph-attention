@@ -7,7 +7,8 @@ dependencies = [
     "trainer-tools @ https://github.com/ssslakter/trainer-tools.git",
     "black>=26.1.0,<27",
     "numpy<2.4",
-    "plotly>=6.5.2,<7",
+    "plotly>=6.5.2,<7", 
+    "trackio-ui @ https://github.com/ssslakter/trackio_ui.git",
 ]
 name = "graph-attention"
 requires-python = ">= 3.11,<3.14"

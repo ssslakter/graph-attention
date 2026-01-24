@@ -15,16 +15,17 @@ optimizer:
 model:
   attention_layer:
     graph_estimator:
-      k_neighbors: 128
+      k_neighbors: null
     graph_filter:
       order: 2
       basis: monomial
+      init_std: 0.3
 
 training:
   epochs: 30
   use_amp: true
 
 attn: ${model.attention_layer}
-prefix: ${attn.graph_filter.basis}_o${attn.graph_filter.order}
+prefix: o${attn.graph_filter.order}_no_sparse
 suffix: ${now:%H-%M-%S}
 run: ${prefix}/${now:%Y-%m-%d}/${suffix}

@@ -51,14 +51,6 @@ class LayerActivationStats(Metric):
                         self._stats[f"debug/alphas/{name}/alpha_{k}/max"] = k_vals.max().item()
                         for h in range(k_vals.shape[0]):
                            self._stats[f"debug/alphas/{name}/alpha_{k}/h{h:02d}"] = k_vals[h].item()
-
-                    # If gradients are available, log their summaries too
-                    if getattr(alphas, "grad", None) is not None:
-                        g_vals = alphas.grad.detach().float().squeeze(-1).squeeze(-1).squeeze(1).abs()
-                        for k in range(g_vals.shape[0]):
-                            k_grads = g_vals[k]  # (H,)
-                            self._stats[f"debug/alphas/{name}/alpha_grad_{k}/mean"] = k_grads.mean().item()
-                            self._stats[f"debug/alphas/{name}/alpha_grad_{k}/max"] = k_grads.max().item()
         return hook
 
     def _register(self, model):
