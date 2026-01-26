@@ -21,6 +21,7 @@ training:
   amp_dtype: float16
   device: cuda
   grad_clip: 1.0
+  spectral_loss_lambda: 0.0
 
 hooks:
   checkpoint:

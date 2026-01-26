@@ -88,18 +88,16 @@ class Transformer(nn.Module):
         heads: int,
         dim_head: int,
         mlp_dim: int,
-        attention_layer: Optional[Callable] = None,
+        attention_layer: Callable,
     ):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
         self.layers = nn.ModuleList([])
 
-        # Use passed attention layer factory or default to standard Attention
-        create_attn = attention_layer if attention_layer is not None else partial(Attention, dim_head=dim_head)
 
         for _ in range(depth):
             self.layers.append(
-                nn.ModuleList([create_attn(dim=dim, heads=heads, dim_head=dim_head), FeedForward(dim, mlp_dim)])
+                nn.ModuleList([attention_layer(dim=dim, heads=heads, dim_head=dim_head), FeedForward(dim, mlp_dim)])
             )
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:

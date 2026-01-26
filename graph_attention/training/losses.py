@@ -3,7 +3,7 @@ import torch.nn as nn
 from ..models.layers.agf import AGFAttention
 
 
-def get_total_spectral_loss(model: nn.Module, lambda_smooth: float = 0.01) -> dict:
+def get_total_spectral_loss(model: nn.Module) -> dict:
     """
     Iterates over the model, calls get_regularization_loss on every AGFLayer,
     and returns the total.
@@ -12,6 +12,6 @@ def get_total_spectral_loss(model: nn.Module, lambda_smooth: float = 0.01) -> di
 
     for module in model.modules():
         if isinstance(module, AGFAttention):
-            total_loss = total_loss + module.get_regularization_loss(lambda_smooth)
+            total_loss += module.get_regularization_loss()
 
     return total_loss

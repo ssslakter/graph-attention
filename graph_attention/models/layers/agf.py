@@ -61,7 +61,7 @@ class AGFAttention(nn.Module):
         values_merged = values_filtered.transpose(1, 2).contiguous().view(batch_size, num_nodes, -1)
         return self.to_out(values_merged)
 
-    def get_regularization_loss(self, lambda_smooth: float = 0.01) -> torch.Tensor:
+    def get_regularization_loss(self) -> torch.Tensor:
         """
         Computes the spectral smoothness loss for this specific layer.
         (Minimizes Dirichlet Energy).
@@ -81,7 +81,7 @@ class AGFAttention(nn.Module):
 
         loss = -1.0 * (smoothness / normalization)
 
-        return loss * lambda_smooth
+        return loss
 
 
 AGFLayer = AGFAttention  # Alias for backward compatibility
