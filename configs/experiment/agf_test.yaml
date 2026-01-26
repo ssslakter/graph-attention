@@ -6,26 +6,21 @@ defaults:
   - override /optimizer: adamw
   - override /scheduler: onecycle
   - override /model/layers@model.attention_layer: agf
-  - override /model/layers/estimator@model.attention_layer.graph_estimator: attention
-  - override /model/layers/filter@model.attention_layer.graph_filter: polynomial
 
 optimizer:
   lr: 0.001
 
 model:
   attention_layer:
-    graph_estimator:
-      k_neighbors: null
-    graph_filter:
-      order: 2
-      basis: monomial
-      init_std: 0.3
+    top_k: null
+    order: 2
+    basis: monomial
 
 training:
   epochs: 20
   use_amp: true
 
 attn: ${model.attention_layer}
-prefix: positive_alphas_o${attn.graph_filter.order}
+prefix: positive_alphas_o${attn.order}
 suffix: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 run: ${prefix}/${suffix}

@@ -3,8 +3,9 @@ import torch
 from torch import nn
 from functools import partial
 from typing import Optional, Union, Tuple, Callable
+from .layers.agf import AGFAttention
 
-from einops import rearrange
+
 from einops.layers.torch import Rearrange
 
 # helpers
@@ -29,82 +30,25 @@ def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
 # classes
 
 
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim):
+class HighOrderViTBlock(nn.Module):
+    def __init__(self, attention_layer, dim=384, num_heads=6, mlp_ratio=4.0):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.LayerNorm(dim),
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = attention_layer(dim=dim, num_heads=num_heads)
+        self.norm2 = nn.LayerNorm(dim)
+
+        hidden_dim = int(dim * mlp_ratio)
+        self.mlp = nn.Sequential(
             nn.Linear(dim, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, dim),
         )
 
-    def forward(self, x):
-        return self.net(x)
-
-
-class Attention(nn.Module):
-    def __init__(self, dim, heads=8, dim_head=64):
-        super().__init__()
-        inner_dim = dim_head * heads
-        self.heads = heads
-        self.scale = dim_head**-0.5
-        self.norm = nn.LayerNorm(dim)
-
-        self.attend = nn.Softmax(dim=-1)
-
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
-        self.to_out = nn.Linear(inner_dim, dim, bias=False)
-
-    def forward(self, x, mask=None):
-        x = self.norm(x)
-
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=self.heads), qkv)
-
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-
-        if mask is not None:
-            # Mask should be broadcastable to (b, h, n, n)
-            mask_value = -torch.finfo(dots.dtype).max
-            dots = dots.masked_fill(mask == 0, mask_value)
-
-        attn = self.attend(dots)
-
-        out = torch.matmul(attn, v)
-        out = rearrange(out, "b h n d -> b n (h d)")
-        return self.to_out(out)
-
-
-class Transformer(nn.Module):
-    """
-    Transformer encoder composed of multiple layers of Attention and FeedForward blocks.
-    """
-
-    def __init__(
-        self,
-        dim: int,
-        depth: int,
-        heads: int,
-        dim_head: int,
-        mlp_dim: int,
-        attention_layer: Callable,
-    ):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.layers = nn.ModuleList([])
-
-
-        for _ in range(depth):
-            self.layers.append(
-                nn.ModuleList([attention_layer(dim=dim, heads=heads, dim_head=dim_head), FeedForward(dim, mlp_dim)])
-            )
-
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        for attn, ff in self.layers:
-            x = attn(x, mask=mask) + x
-            x = ff(x) + x
-        return self.norm(x)
+    def forward(self, X):
+        # High-order polynomial multi-head attention + MLP
+        X = X + self.attn(self.norm1(X))
+        X = X + self.mlp(self.norm2(X))
+        return X
 
 
 class SimpleViT(nn.Module):
@@ -120,11 +64,10 @@ class SimpleViT(nn.Module):
         num_classes: int,
         dim: int,
         depth: int,
-        heads: int,
-        mlp_dim: int,
+        num_heads: int,
+        mlp_ratio: int,
+        attention_layer: Callable,
         channels: int = 3,
-        dim_head: int = 64,
-        attention_layer: Optional[Callable] = None,
     ):
         super().__init__()
         image_height, image_width = pair(image_size)
@@ -149,12 +92,16 @@ class SimpleViT(nn.Module):
             dim=dim,
         )
 
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, attention_layer)
-
+        self.norm = nn.LayerNorm(dim)
+        self.blocks = nn.ModuleList(
+            [
+                HighOrderViTBlock(attention_layer, dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio)
+                for _ in range(depth)
+            ]
+        )
         self.pool = "mean"
-        self.to_latent = nn.Identity()
 
-        self.linear_head = nn.Linear(dim, num_classes)
+        self.head = nn.Linear(dim, num_classes)
 
     def forward(self, img):
         device = img.device
@@ -162,8 +109,8 @@ class SimpleViT(nn.Module):
         x = self.to_patch_embedding(img)
         x += self.pos_embedding.to(device, dtype=x.dtype)
 
-        x = self.transformer(x)
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
         x = x.mean(dim=1)
-
-        x = self.to_latent(x)
-        return self.linear_head(x)
+        return self.head(x)

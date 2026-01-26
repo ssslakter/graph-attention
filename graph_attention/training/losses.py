@@ -12,6 +12,6 @@ def get_total_spectral_loss(model: nn.Module) -> dict:
 
     for module in model.modules():
         if isinstance(module, AGFAttention):
-            total_loss += module.get_regularization_loss()
+            total_loss += module.get_reg_loss()
 
     return total_loss

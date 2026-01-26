@@ -1,4 +1,0 @@
-# @package _group_
-_target_: graph_attention.models.layers.graph_estimators.AttentionStyleEstimator
-_partial_: true
-k_neighbors: 64
