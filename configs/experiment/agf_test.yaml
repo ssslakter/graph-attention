@@ -22,10 +22,10 @@ model:
       init_std: 0.3
 
 training:
-  epochs: 30
+  epochs: 20
   use_amp: true
 
 attn: ${model.attention_layer}
-prefix: o${attn.graph_filter.order}_no_sparse
+prefix: positive_alphas_o${attn.graph_filter.order}
 suffix: ${now:%H-%M-%S}
 run: ${prefix}/${now:%Y-%m-%d}/${suffix}

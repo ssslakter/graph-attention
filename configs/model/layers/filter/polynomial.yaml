@@ -3,3 +3,4 @@ _target_: graph_attention.models.layers.graph_filters.PolynomialFilter
 _partial_: true
 order: 3
 init_std: 0.1
+learn_zero_order: false

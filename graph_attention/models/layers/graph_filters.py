@@ -35,23 +35,34 @@ class PolynomialFilter(GraphFilter):
     filtering characteristics (smoothing vs sharpening) in different subspaces.
     """
 
-    def __init__(self, order: int, num_heads: int, basis: str = "monomial", init_std: float = 0.1):
+    def __init__(
+        self,
+        order: int,
+        num_heads: int,
+        basis: str = "monomial",
+        init_std: float = 0.1,
+        alphas_act: str = "sigmoid",
+        learn_zero_order: bool = True,
+    ):
         super().__init__()
         self.order = order
+        self.learn_zero_ord = learn_zero_order
         self.basis = basis.lower()
         self.alpha_raw = nn.Parameter(torch.randn(order + 1, num_heads) * init_std)
+        self.act = torch.sigmoid if alphas_act == "sigmoid" else torch.tanh
 
     @property
     def alphas(self):
-        return torch.tanh(self.alpha_raw)
+        return self.act(self.alpha_raw)
 
     def forward(self, adj: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         with torch.autocast(device_type="cuda", enabled=False):
             adj, x, alphas = adj.float(), x.float(), self.alphas.float()
             alphas = alphas[:, None, :, None, None]
 
+            out = alphas[0] * x if self.learn_zero_ord else torch.zeros_like(x)
             if self.basis == "monomial":
-                out, curr = alphas[0] * x, x
+                curr = x
                 for k in range(1, self.order + 1):
                     curr = torch.matmul(adj, curr)
                     out = out + alphas[k] * curr
@@ -59,8 +70,6 @@ class PolynomialFilter(GraphFilter):
 
             # --- Chebyshev Basis ---
             t_prev = x
-            out = alphas[0] * t_prev
-
             if self.order > 0:
                 # T_1(x) = (2A - I)x = 2(Ax) - x
                 t_curr = 2 * torch.matmul(adj, x) - x

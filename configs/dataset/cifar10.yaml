@@ -3,4 +3,4 @@ dataset:
   variant: cifar10
   root: data
   channels: 3
-  augmentation: standard
+  augmentation: strong
