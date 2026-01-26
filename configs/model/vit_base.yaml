@@ -1,7 +1,4 @@
 # @package _global_
-defaults:
-  - /model/layers@model.attention_layer: attention
-
 model:
   _target_: graph_attention.models.simple_vit.SimpleViT
   image_size: 32

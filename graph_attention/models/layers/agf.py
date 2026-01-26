@@ -55,6 +55,10 @@ class AGFAttention(nn.Module):
         self.register_buffer("last_adj", None, persistent=False)
         self.register_buffer("last_x", None, persistent=False)
         self.init_as_standard_attention()
+    
+    @property
+    def alphas(self):
+        return self.act(self.alphas_raw)
 
     @torch.no_grad()
     def init_as_standard_attention(self):

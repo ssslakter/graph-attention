@@ -1126,7 +1126,7 @@ packages:
 - pypi: ./
   name: graph-attention
   version: 0.1.0
-  sha256: 74b213cb70e3f73918a0a577a3a353cef37f0701e12f26ac9691de45112a2fd1
+  sha256: 104fd279c2c47e5a2edab68bef417ce0e4b801f5288b70bb65ff66a398701aff
   requires_dist:
   - einops>=0.8.1,<0.9
   - trainer-tools @ git+https://github.com/ssslakter/trainer-tools.git
