@@ -44,8 +44,8 @@ class AGFAttention(nn.Module):
         self.basis, self.scale = basis.lower(), dim_head**-0.5
 
         inner = num_heads * dim_head
-        self.to_qkv = nn.Linear(dim, inner * 3, bias=False)
-        self.to_out = nn.Linear(inner, dim, bias=False)
+        self.to_qkv = nn.Linear(dim, inner * 3, bias=True)
+        self.to_out = nn.Linear(inner, dim, bias=True)
 
         # Coefficients
         self.alphas_raw = nn.Parameter(torch.randn(order + 1, num_heads) * 0.02)

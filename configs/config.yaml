@@ -56,6 +56,6 @@ hydra:
     dir: outputs/${run}
   sweep:
     dir: outputs/multirun/${now:%Y-%m-%d_%H-%M-%S}
-    subdir: order_${model.attention_layer.graph_filter.order}
+    subdir: order_${model.attention_layer.order}
   job:
     chdir: false

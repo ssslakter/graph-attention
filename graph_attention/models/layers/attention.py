@@ -11,8 +11,8 @@ class Attention(nn.Module):
 
         self.attend = nn.Softmax(dim=-1)
 
-        self.to_qkv = nn.Linear(dim, dim * 3, bias=False)
-        self.to_out = nn.Linear(dim, dim, bias=False)
+        self.to_qkv = nn.Linear(dim, dim * 3, bias=True)
+        self.to_out = nn.Linear(dim, dim, bias=True)
 
     def forward(self, x, mask=None):
         qkv = self.to_qkv(x).chunk(3, dim=-1)

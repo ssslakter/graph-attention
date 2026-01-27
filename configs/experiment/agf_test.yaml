@@ -2,19 +2,19 @@
 
 defaults:
   - /model/layers@model.attention_layer: agf
-  - override /model: vit_tiny
+  - override /model: vit_small
   - override /dataset: cifar10
   - override /optimizer: adamw
   - override /scheduler: onecycle
 
 optimizer:
-  lr: 0.001
+  lr: 0.0001
   weight_decay: 0.05
 
 model:
   attention_layer:
     top_k: null
-    order: 2
+    order: 1
     basis: monomial
     alphas_act: none
 

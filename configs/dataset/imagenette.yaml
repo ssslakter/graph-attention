@@ -1,0 +1,6 @@
+# @package _global_
+dataset:
+  variant: cifar10
+  root: data
+  channels: 3
+  augmentation: strong

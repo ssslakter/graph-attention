@@ -1,61 +1,46 @@
-from typing import Literal, Optional, List, Union, Callable
-from torchvision.datasets import CIFAR10, CIFAR100
 import torchvision.transforms as tfm
-from torch.utils.data import Dataset
-import torch
+from torchvision.datasets import CIFAR10, CIFAR100
+from .utils import register_dataset, get_dataset
 
-DATASET_STATS = {
-    "cifar10": {
-        "mean": (0.4914, 0.4822, 0.4465),
-        "std": (0.2470, 0.2435, 0.2616),
-        "cls": CIFAR10
-    },
-    "cifar100": {
-        "mean": (0.5071, 0.4867, 0.4408),
-        "std": (0.2675, 0.2565, 0.2761),
-        "cls": CIFAR100
-    }
+STATS = {
+    "cifar10":  {"mean": (0.4914, 0.4822, 0.4465), "std": (0.2470, 0.2435, 0.2616)},
+    "cifar100": {"mean": (0.5071, 0.4867, 0.4408), "std": (0.2675, 0.2565, 0.2761)}
 }
 
-def get_transforms(variant: str, train: bool = True, augmentation: str = "standard", normalize: bool = True) -> tfm.Compose:
-    stats = DATASET_STATS.get(variant)
-    if not stats:
-        raise ValueError(f"Unknown variant: {variant}")
-
-    normalization = [tfm.Normalize(stats["mean"], stats["std"])] if normalize else []
-
-    if not train:
-        return tfm.Compose([tfm.ToTensor()] + normalization)
-
-    aug_strategies = {
-        "none": [],
-        "standard": [tfm.RandomCrop(32, padding=4), tfm.RandomHorizontalFlip(), tfm.TrivialAugmentWide()],
-        "strong": [tfm.RandomCrop(32, padding=4), tfm.RandomHorizontalFlip(), tfm.RandAugment(num_ops=2, magnitude=9)],
-    }
-
-    if augmentation not in aug_strategies:
-        raise ValueError(f"Unknown augmentation: {augmentation}")
-
-    transforms = aug_strategies[augmentation] + [tfm.ToTensor()] + normalization
-    return tfm.Compose(transforms)
-
-def get_cifar(
-    root: str = "./data",
-    train: bool = True,
-    transforms: Optional[Union[List, Callable, tfm.Compose]] = None,
-    variant: Literal["cifar10", "cifar100"] = "cifar10",
-    normalize: bool = True,
-) -> Dataset:
-    stats = DATASET_STATS.get(variant)
-    if not stats:
-        raise ValueError(f"Unknown variant: {variant}")
+def _cifar_transforms_factory(variant: str):
+    """Returns a factory function bound to the specific variant stats."""
+    mean, std = STATS[variant]["mean"], STATS[variant]["std"]
     
-    if transforms is None:
-        transforms = get_transforms(variant, train=train, normalize=normalize)
-    elif isinstance(transforms, list):
-        if not any(isinstance(t, tfm.ToTensor) for t in transforms):
-            transforms = transforms + [tfm.ToTensor()]
-        normalization = [tfm.Normalize(stats["mean"], stats["std"])] if normalize else []
-        transforms = tfm.Compose(transforms + normalization)
+    def factory(train: bool, augmentation: str, normalize: bool):
+        normalization = [tfm.Normalize(mean, std)] if normalize else []
+        
+        if not train:
+            return tfm.Compose([tfm.ToTensor()] + normalization)
+            
+        base_aug = [tfm.RandomCrop(32, padding=4), tfm.RandomHorizontalFlip()]
+        
+        aug_strategies = {
+            "none": [],
+            "standard": base_aug + [tfm.TrivialAugmentWide()],
+            "strong": base_aug + [tfm.RandAugment(num_ops=2, magnitude=9)],
+        }
+        
+        if augmentation not in aug_strategies:
+            raise ValueError(f"Unknown augmentation: {augmentation}")
+            
+        return tfm.Compose(aug_strategies[augmentation] + [tfm.ToTensor()] + normalization)
+    
+    return factory
 
-    return stats["cls"](root=root, train=train, download=True, transform=transforms)
+for name, cls in [("cifar10", CIFAR10), ("cifar100", CIFAR100)]:
+    register_dataset(
+        name=name,
+        cls=cls,
+        mean=STATS[name]["mean"],
+        std=STATS[name]["std"],
+        transform_factory=_cifar_transforms_factory(name)
+    )
+
+def get_cifar(variant="cifar10", **kwargs):
+    kwargs['variant'] = variant
+    return get_dataset(**kwargs)
