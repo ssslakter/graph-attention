@@ -4,7 +4,7 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
-from graph_attention.data.cifar import get_cifar, get_transforms
+from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 log = logging.getLogger(__name__)
@@ -15,10 +15,10 @@ def _build_datasets_and_loaders(cfg: DictConfig):
     dl_cfg = OmegaConf.to_container(cfg.dataloader, resolve=True)
     bs, valid_bs = dl_cfg.pop("batch_size"), dl_cfg.pop("valid_batch_size")
 
-    train_ds = get_cifar(
+    train_ds = get_dataset(
+        cfg.dataset.variant,
         cfg.dataset.root,
-        True,
-        variant=cfg.dataset.variant,
+        train=True,
         transforms=get_transforms(cfg.dataset.variant, True, cfg.dataset.augmentation),
     )
 
@@ -29,7 +29,7 @@ def _build_datasets_and_loaders(cfg: DictConfig):
         **dl_cfg,
     )
     valid_dl = DataLoader(
-        get_cifar(cfg.dataset.root, False, variant=cfg.dataset.variant),
+        get_dataset(cfg.dataset.variant, cfg.dataset.root, train=False),
         batch_size=valid_bs,
         shuffle=False,
         **dl_cfg,
@@ -75,6 +75,14 @@ def build_hooks(hook_cfg: DictConfig, config: DictConfig = None):
         if name == "metrics" and config is not None:
             h_cfg["config"] = json.dumps(OmegaConf.to_container(remove_disabled_hooks(config), resolve=True))
         hooks.append(instantiate(h_cfg, _recursive_=True))
+
+    hooks.append(
+        BatchTransformHook(
+            transform=get_batch_transforms(
+                config.dataset.variant, config.dataset.augmentation, num_classes=config.model.num_classes
+            )
+        )
+    )
     return hooks
 
 
@@ -112,7 +120,7 @@ def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
         loss_func=torch.nn.CrossEntropyLoss(label_smoothing=0.1),
         epochs=cfg.training.epochs,
         hooks=[h for h in hooks if h],
-        config=cfg
+        config=cfg,
     )
 
 
@@ -126,6 +134,8 @@ def main(cfg: DictConfig):
     with open_dict(cfg):
         cfg.model.num_classes = len(train_dataloader.dataset.classes)
     model = instantiate(cfg.model, channels=cfg.dataset.channels, num_classes=cfg.model.num_classes)
+    torch.set_float32_matmul_precision(cfg.torch.get("matmul_precision", "high"))
+    model = torch.compile(model) if cfg.torch.get("compile", False) else model
     optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
 
     hooks = build_hooks(cfg.hooks, config=cfg)

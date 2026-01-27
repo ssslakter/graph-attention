@@ -19,7 +19,8 @@ training:
 
 dataloader:
   batch_size: 512      # Larger batches stabilize ViT training
-  num_workers: 8
+  valid_batch_size: 512
+  num_workers: 6
 
 # Overriding Hooks for Optimal Convergence
 hooks:
@@ -27,12 +28,10 @@ hooks:
     decay: 0.999       # better for 300 epochs on small data
   
   metrics:
-    project: vit-cifar10-sota
     metrics:
       - _target_: graph_attention.training.metrics.LayerActivationStats
         freq: 100
       - _target_: trainer_tools.metrics.Loss
       - _target_: trainer_tools.metrics.Accuracy
 
-# Naming the run for easy tracking
-run: vit_tiny_cifar10_300e_${now:%H-%M-%S}
+run: vit_tiny_cifar10/${now:%Y-%m-%d_%H-%M-%S}

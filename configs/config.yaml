@@ -14,6 +14,10 @@ dataloader:
   persistent_workers: true
   pin_memory: true
 
+torch:
+  compile: true
+  matmul_precision: high
+
 training:
   seed: 42
   epochs: 30
@@ -42,7 +46,7 @@ hooks:
     _target_: trainer_tools.hooks.MetricsHook
     verbose: false
     tracker_type: trackio  # 'wandb', 'trackio' or null
-    project: graph-attention
+    project: graph-attn
     name: ${run}
     metrics:
       - _target_: graph_attention.training.metrics.LayerActivationStats

@@ -11,7 +11,8 @@ def register_dataset(
     cls: Callable, 
     mean: tuple, 
     std: tuple, 
-    transform_factory: Callable[[bool, str, bool], tfm.Compose]
+    transform_factory: Callable[[bool, str, bool], tfm.Compose],
+    batch_transform_factory: Optional[Callable] = None
 ):
     """
     Registers a dataset.
@@ -27,7 +28,8 @@ def register_dataset(
         "cls": cls,
         "mean": mean,
         "std": std,
-        "transform_factory": transform_factory
+        "transform_factory": transform_factory,
+        "batch_transform_factory": batch_transform_factory
     }
 
 def get_registry_info(variant: str):
@@ -45,6 +47,16 @@ def get_transforms(
     """
     info = get_registry_info(variant)
     return info["transform_factory"](train, augmentation, normalize)
+
+def get_batch_transforms(variant: str, augmentation: str, num_classes: int):
+    """
+    Returns batch-level transforms (like Mixup/CutMix) if defined for the variant/aug.
+    Returns None by default.
+    """
+    info = _DATASET_REGISTRY.get(variant)
+    if info and info.get("batch_transform_factory"):
+        return info["batch_transform_factory"](augmentation, num_classes)
+    return None
 
 def get_dataset(
     variant: str,

@@ -1,3 +1,3 @@
 # @package _group_
-_target_: graph_attention.models.simple_vit.Attention
+_target_: graph_attention.models.layers.Attention
 _partial_: true
