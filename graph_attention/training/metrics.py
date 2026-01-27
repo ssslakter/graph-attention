@@ -13,7 +13,6 @@ class LayerActivationStats(Metric):
     """
 
     def __init__(self, layer_cls=AGFAttention, freq: int = 1):
-        # We collect this 'after_loss' to ensure the forward pass is complete
         super().__init__("layer_stats", freq, phase="after_loss", use_prefix=False)
         self.layer_cls = layer_cls
         self._stats = {}
@@ -25,21 +24,18 @@ class LayerActivationStats(Metric):
                 return
 
             x_in = inp[0] if isinstance(inp, tuple) else inp
-            x_out = out
 
             with torch.no_grad():
                 in_n = x_in.norm(p=2, dim=-1).mean().item()
-                out_n = x_out.norm(p=2, dim=-1).mean().item()
+                out_n = out.norm(p=2, dim=-1).mean().item()
 
                 self._stats.update(
                     {
                         f"debug/norms/{name}/in_norm": in_n,
                         f"debug/norms/{name}/out_norm": out_n,
-                        f"debug/norms/{name}/gain": out_n / (in_n + 1e-6),
                     }
                 )
 
-                # Alpha Coefficients (Directly from property)
                 # Expected shape: (Order + 1, Heads)
                 if (alphas := getattr(module, "alphas", None)) is not None:
                     a_vals = alphas.detach().float()

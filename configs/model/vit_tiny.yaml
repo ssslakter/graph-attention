@@ -2,9 +2,8 @@
 model:
   _target_: graph_attention.models.simple_vit.SimpleViT
   image_size: 32
-  patch_size: 4
-  dim: 384
-  depth: 2
-  num_heads: 1
-  mlp_ratio: 4
-  
+  patch_size: 4   
+  dim: 192        # Standard Tiny embedding dim
+  depth: 12       # Standard depth for convergence
+  num_heads: 3    # 192 / 3 = 64 head dimension (standard)
+  mlp_ratio: 4    # Standard expansion ratio

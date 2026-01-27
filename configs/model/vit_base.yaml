@@ -3,8 +3,7 @@ model:
   _target_: graph_attention.models.simple_vit.SimpleViT
   image_size: 32
   patch_size: 4
-  dim: 256
-  depth: 6
-  num_heads: 4
-  mlp_ratio: 2
-  
+  dim: 768
+  depth: 12
+  num_heads: 12
+  mlp_ratio: 4

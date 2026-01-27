@@ -2,13 +2,12 @@
 import torch
 from torch import nn
 from typing import Union, Tuple, Callable
-from .layers import HighOrderViTBlock
+from .layers import ViTBlock
 
 
 from einops.layers.torch import Rearrange
 
 # helpers
-
 
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
@@ -24,10 +23,6 @@ def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
     x = x.flatten()[:, None] * omega[None, :]
     pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
     return pe.type(dtype)
-
-
-# classes
-
 
 
 class SimpleViT(nn.Module):
@@ -65,28 +60,36 @@ class SimpleViT(nn.Module):
             nn.LayerNorm(dim),
         )
 
-        self.pos_embedding = posemb_sincos_2d(
+        pos_embedding = posemb_sincos_2d(
             h=image_height // patch_height,
             w=image_width // patch_width,
             dim=dim,
         )
+        self.register_buffer("pos_embedding", pos_embedding.unsqueeze(0))
 
-        self.norm = nn.LayerNorm(dim)
         self.blocks = nn.ModuleList(
             [
-                HighOrderViTBlock(attention_layer, dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio)
+                ViTBlock(attention_layer, dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio)
                 for _ in range(depth)
             ]
         )
-        self.pool = "mean"
 
+        self.norm = nn.LayerNorm(dim)
         self.head = nn.Linear(dim, num_classes)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            torch.nn.init.trunc_normal_(m.weight, std=0.02)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
 
     def forward(self, img):
-        device = img.device
-
         x = self.to_patch_embedding(img)
-        x += self.pos_embedding.to(device, dtype=x.dtype)
+        x = x + self.pos_embedding
 
         for blk in self.blocks:
             x = blk(x)

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from einops.layers.torch import Rearrange
-from .layers import Attention, HighOrderViTBlock
+from .layers import Attention, ViTBlock
 
 
 class ViT(nn.Module):
@@ -35,7 +35,7 @@ class ViT(nn.Module):
         self.pos_drop = nn.Dropout(p=0.0)
 
         self.blocks = nn.ModuleList([
-            HighOrderViTBlock(attention_layer, dim, num_heads, mlp_ratio)
+            ViTBlock(attention_layer, dim, num_heads, mlp_ratio)
             for _ in range(depth)
         ])
 

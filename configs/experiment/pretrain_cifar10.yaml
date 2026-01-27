@@ -1,0 +1,38 @@
+# @package _global_
+
+defaults:
+  - /model/layers@model.attention_layer: attention
+  - override /model: vit_tiny
+  - override /dataset: cifar10
+  - override /optimizer: adamw
+  - override /scheduler: onecycle
+
+# Optimization Parameters
+optimizer:
+  lr: 1e-3
+  weight_decay: 0.1    # Increased WD to combat overfitting on small data
+
+training:
+  epochs: 300          # ViTs need 300+ epochs to compete with CNNs
+  use_amp: true
+  grad_clip: 1.0
+
+dataloader:
+  batch_size: 512      # Larger batches stabilize ViT training
+  num_workers: 8
+
+# Overriding Hooks for Optimal Convergence
+hooks:
+  ema:
+    decay: 0.999       # better for 300 epochs on small data
+  
+  metrics:
+    project: vit-cifar10-sota
+    metrics:
+      - _target_: graph_attention.training.metrics.LayerActivationStats
+        freq: 100
+      - _target_: trainer_tools.metrics.Loss
+      - _target_: trainer_tools.metrics.Accuracy
+
+# Naming the run for easy tracking
+run: vit_tiny_cifar10_300e_${now:%H-%M-%S}

@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 
-class HighOrderViTBlock(nn.Module):
+class ViTBlock(nn.Module):
     def __init__(self, attention_layer, dim=384, num_heads=6, mlp_ratio=4.0):
         super().__init__()
         self.norm1 = nn.LayerNorm(dim, eps=1e-6)

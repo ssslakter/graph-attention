@@ -4,7 +4,6 @@ model:
   image_size: 32
   patch_size: 4
   dim: 384
-  depth: 4
-  num_heads: 3
+  depth: 12
+  num_heads: 6
   mlp_ratio: 4
-  
