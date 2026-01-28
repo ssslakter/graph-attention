@@ -22,7 +22,7 @@ dataloader:
   valid_batch_size: 512
   num_workers: 6
 
-# Overriding Hooks for Optimal Convergence
+
 hooks:
   ema:
     decay: 0.999       # better for 300 epochs on small data
@@ -31,8 +31,6 @@ hooks:
     metrics:
       - _target_: graph_attention.training.metrics.LayerActivationStats
         freq: 1000
-      - _target_: trainer_tools.metrics.Loss
-      - _target_: trainer_tools.metrics.Accuracy
   checkpoint:
     save_every_steps: 1000
     keep_last: 1000

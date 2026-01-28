@@ -1,19 +1,18 @@
 import plotly.graph_objects as go
 import torch.nn as nn, torch, numpy as np
 from plotly.subplots import make_subplots
+from ..models.layers import AGFAttention
 
-from ..models.layers import PolynomialFilter
 
-
-def _get_graph_filters(model: nn.Module) -> list[PolynomialFilter]:
-    return [m for m in model.modules() if isinstance(m, PolynomialFilter)]
+def _get_graph_filters(model: nn.Module) -> list[AGFAttention]:
+    return [m for m in model.modules() if isinstance(m, AGFAttention)]
 
 
 
 def plot_alphas(model: nn.Module, width: int = None, height: int = 600, raw: bool = False):
     "Plot alpha weights per head/layer with clean formatting and LaTeX support"
     layers = _get_graph_filters(model)
-    attr = "alpha_raw" if raw else "alphas"
+    attr = "alphas_raw" if raw else "alphas"
     alphas = torch.stack([getattr(l, attr).detach().cpu() for l in layers])  # [layers, alphas, heads]
     nl, na, nh = alphas.shape
 

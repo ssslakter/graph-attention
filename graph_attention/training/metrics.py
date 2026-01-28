@@ -1,6 +1,6 @@
 import torch
 from torch._dynamo import disable
-from trainer_tools.metrics import Metric
+from trainer_tools.hooks.metrics import Metric
 from ..models.layers import AGFAttention, Attention
 
 

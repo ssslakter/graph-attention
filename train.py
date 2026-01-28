@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
+from graph_attention.training.utils import StepInitHook, load_pretrained
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 log = logging.getLogger(__name__)
@@ -56,6 +57,8 @@ def _build_optimizer_and_scheduler(cfg: DictConfig, model: torch.nn.Module, trai
 
     if "OneCycleLR" in scheduler_conf.get("_target_", ""):
         scheduler = instantiate(scheduler_conf, optimizer=optimizer, total_steps=total_steps)
+    elif "CosineAnnealingLR" in scheduler_conf.get("_target_", ""):
+        scheduler = instantiate(scheduler_conf, optimizer=optimizer, T_max=total_steps)
     else:
         scheduler = instantiate(scheduler_conf, optimizer=optimizer)
 
@@ -83,7 +86,7 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
     hooks.insert(0, ProgressBarHook())
 
     if scheduler:
-        hooks.append(LRSchedulerHook(scheduler, step_on_batch=True))
+        hooks.append(LRSchedulerHook(scheduler))
 
     if cfg.training.get("use_amp"):
         hooks.append(
@@ -96,6 +99,9 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
 
     if cfg.training.get("grad_clip"):
         hooks.append(GradClipHook(max_norm=cfg.training.grad_clip))
+    
+    if cfg.training.get("init_step"):
+        hooks.append(StepInitHook(cfg.training.init_step))
 
 
 def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
@@ -125,7 +131,12 @@ def main(cfg: DictConfig):
     train_dataloader, test_dataloader = _build_datasets_and_loaders(cfg)
     with open_dict(cfg):
         cfg.model.num_classes = len(train_dataloader.dataset.classes)
-    model = instantiate(cfg.model, channels=cfg.dataset.channels, num_classes=cfg.model.num_classes)
+        cfg.model.channels = cfg.dataset.channels
+    model = instantiate(cfg.model)
+    if p:=cfg.training.get("pretrained_path"):
+        log.info(f"Loading pretrained weights from {p}")
+        model = load_pretrained(model, p)
+
     torch.set_float32_matmul_precision(cfg.torch.get("matmul_precision", "high"))
     model = torch.compile(model) if cfg.torch.get("compile", False) else model
     optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)

@@ -23,6 +23,7 @@ class AGFAttention(nn.Module):
         "tanh": torch.tanh,
         "relu": F.relu,
         "gelu": F.gelu,
+        "softmax": lambda x: F.softmax(x, dim=0),
         "identity": lambda x: x,
         "none": lambda x: x,
     }
@@ -66,6 +67,8 @@ class AGFAttention(nn.Module):
             zero_val, one_val = -5.0, 5.0
         elif self.alphas_act_name == "tanh":
             zero_val, one_val = 0.0, 5.0
+        elif self.alphas_act_name == "softmax":
+            zero_val, one_val = -5.0, 5.0 
         else:
             zero_val, one_val = 0.0, 1.0
         self.alphas_raw.fill_(zero_val)

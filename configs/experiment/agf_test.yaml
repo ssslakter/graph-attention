@@ -2,27 +2,52 @@
 
 defaults:
   - /model/layers@model.attention_layer: agf
-  - override /model: vit_small
+  - override /model: vit_tiny
   - override /dataset: cifar10
   - override /optimizer: adamw
-  - override /scheduler: onecycle
+  - override /scheduler: cosine
 
 optimizer:
-  lr: 0.0001
+  lr: 5e-4
   weight_decay: 0.05
 
 model:
   attention_layer:
     top_k: null
-    order: 1
+    order: 2
     basis: monomial
     alphas_act: none
+    learn_zero_order: false
 
 training:
-  epochs: 20
+  epochs: 90
   use_amp: true
+  pretrained_path: "outputs/vit_tiny_cifar10/2026-01-28_23-50-21/checkpoints/checkpoint_step_3000.pt"
+  init_step: 3000 # match checkpoint step to continue lr schedule smoothly
+
+
+dataloader:
+  batch_size: 512
+  valid_batch_size: 512
+  num_workers: 6
+
+
+hooks:
+  ema:
+    decay: 0.999
+  
+  metrics:
+    metrics:
+      - _target_: graph_attention.training.metrics.LayerActivationStats
+        freq: 500
+      - _target_: trainer_tools.hooks.metrics.Loss
+      - _target_: trainer_tools.hooks.metrics.Accuracy
+      - _target_: trainer_tools.hooks.metrics.LRStats
+  checkpoint:
+    save_every_steps: 1000
+    keep_last: 10
+
 
 attn: ${model.attention_layer}
-prefix: positive_alphas_o${attn.order}
-suffix: ${now:%Y-%m-%d}/${now:%H-%M-%S}
-run: ${prefix}/${suffix}
+prefix: agf_finetune_o${attn.order}_act_${attn.alphas_act}
+run: ${prefix}/${now:%Y-%m-%d}/${now:%H-%M-%S}
