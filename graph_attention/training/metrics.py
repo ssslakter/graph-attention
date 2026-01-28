@@ -1,6 +1,7 @@
 import torch
+from torch._dynamo import disable
 from trainer_tools.metrics import Metric
-from ..models.layers.agf import AGFAttention
+from ..models.layers import AGFAttention, Attention
 
 
 class LayerActivationStats(Metric):
@@ -12,13 +13,14 @@ class LayerActivationStats(Metric):
         freq: How often to log the stats (default: 1).
     """
 
-    def __init__(self, layer_cls=AGFAttention, freq: int = 1):
+    def __init__(self, layer_classes: tuple = (AGFAttention, Attention), freq: int = 1):
         super().__init__("layer_stats", freq, phase="after_loss", use_prefix=False)
-        self.layer_cls = layer_cls
+        self.layer_classes = tuple(layer_classes)
         self._stats = {}
         self._handles = []
 
     def _make_hook(self, name):
+        @disable
         def hook(module, inp, out):
             if not module.training:
                 return
@@ -51,7 +53,7 @@ class LayerActivationStats(Metric):
 
     def _register(self, model):
         """Lazily register hooks on the first pass."""
-        targets = [m for m in model.modules() if isinstance(m, self.layer_cls)]
+        targets = [m for m in model.modules() if isinstance(m, self.layer_classes)]
         for i, layer in enumerate(targets):
             self._handles.append(layer.register_forward_hook(self._make_hook(f"L{i:02d}")))
 

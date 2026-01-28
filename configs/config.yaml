@@ -35,6 +35,8 @@ hooks:
     save_every_steps: 1000
     keep_last: 3
     resume_path: ${hydra:runtime.output_dir}/checkpoints/checkpoint_interrupted.pt
+    save_strategy: best
+    metric_name: valid_loss
 
   ema:
     enabled: true

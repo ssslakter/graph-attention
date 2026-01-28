@@ -75,14 +75,6 @@ def build_hooks(hook_cfg: DictConfig, config: DictConfig = None):
         if name == "metrics" and config is not None:
             h_cfg["config"] = json.dumps(OmegaConf.to_container(remove_disabled_hooks(config), resolve=True))
         hooks.append(instantiate(h_cfg, _recursive_=True))
-
-    hooks.append(
-        BatchTransformHook(
-            transform=get_batch_transforms(
-                config.dataset.variant, config.dataset.augmentation, num_classes=config.model.num_classes
-            )
-        )
-    )
     return hooks
 
 

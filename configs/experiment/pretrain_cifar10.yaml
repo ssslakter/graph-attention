@@ -13,7 +13,7 @@ optimizer:
   weight_decay: 0.1    # Increased WD to combat overfitting on small data
 
 training:
-  epochs: 300          # ViTs need 300+ epochs to compete with CNNs
+  epochs: 200          # ViTs need 300+ epochs to compete with CNNs
   use_amp: true
   grad_clip: 1.0
 
@@ -30,8 +30,10 @@ hooks:
   metrics:
     metrics:
       - _target_: graph_attention.training.metrics.LayerActivationStats
-        freq: 100
+        freq: 1000
       - _target_: trainer_tools.metrics.Loss
       - _target_: trainer_tools.metrics.Accuracy
-
+  checkpoint:
+    save_every_steps: 1000
+    keep_last: 1000
 run: vit_tiny_cifar10/${now:%Y-%m-%d_%H-%M-%S}
