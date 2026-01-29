@@ -3,6 +3,6 @@ _target_: graph_attention.models.layers.agf.AGFAttention
 _partial_: true
 top_k: 64
 order: 3
-learn_zero_order: false
+
 basis: monomial
 alphas_act: sigmoid

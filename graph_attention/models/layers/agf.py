@@ -37,11 +37,10 @@ class AGFAttention(nn.Module):
         top_k: Optional[int] = None,
         basis: str = "monomial",
         alphas_act: str = "sigmoid",
-        learn_zero_order: bool = False,
     ):
         super().__init__()
         self.num_heads, self.dim_head, self.order, self.k = num_heads, dim_head, order, top_k
-        self.learn_zero_order, self.alphas_act_name = learn_zero_order, alphas_act.lower()
+        self.alphas_act_name = alphas_act.lower()
         self.basis, self.scale = basis.lower(), dim_head**-0.5
 
         inner = num_heads * dim_head
@@ -49,7 +48,7 @@ class AGFAttention(nn.Module):
         self.to_out = nn.Linear(inner, dim, bias=True)
 
         # Coefficients
-        self.alphas_raw = nn.Parameter(torch.randn(order + 1, num_heads) * 0.02)
+        self.alphas_raw = nn.Parameter(torch.randn(order, num_heads))
         self.act = self._act_map.get(alphas_act.lower(), lambda x: x)
 
         # State keys for regularization (ephemeral dict is risky for DDP/JIT, used properties)
@@ -64,16 +63,15 @@ class AGFAttention(nn.Module):
     @torch.no_grad()
     def init_as_standard_attention(self):
         if self.alphas_act_name == "sigmoid":
-            zero_val, one_val = -5.0, 5.0
+            zero_val, one_val = -10.0, 10.0
         elif self.alphas_act_name == "tanh":
-            zero_val, one_val = 0.0, 5.0
+            zero_val, one_val = 0.0, 10.0
         elif self.alphas_act_name == "softmax":
-            zero_val, one_val = -5.0, 5.0 
+            zero_val, one_val = -10.0, 10.0 
         else:
             zero_val, one_val = 0.0, 1.0
         self.alphas_raw.fill_(zero_val)
-        if self.order >= 1:
-            self.alphas_raw[1].fill_(one_val)
+        self.alphas_raw[0].fill_(one_val)
         return self
 
     def forward(self, x, mask=None):
@@ -104,10 +102,10 @@ class AGFAttention(nn.Module):
             attn, v = attn.float(), v.float()
             alphas = self.act(self.alphas_raw).view(-1, 1, h, 1, 1).float()
 
-            res = (alphas[0] * v) if self.learn_zero_order else 0
+            res = 0
             v_prev, v_curr = None, v
 
-            for i in range(1, self.order + 1):
+            for i in range(self.order):
                 if self.basis == "monomial":
                     v_curr = attn @ v_curr
                 else:
