@@ -1,5 +1,5 @@
 import hydra, logging, json, torch
-from hydra.utils import instantiate
+from hydra.utils import instantiate, get_class
 from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
@@ -132,7 +132,11 @@ def main(cfg: DictConfig):
     with open_dict(cfg):
         cfg.model.num_classes = len(train_dataloader.dataset.classes)
         cfg.model.channels = cfg.dataset.channels
-    model = instantiate(cfg.model)
+    if ckpt:=cfg.model.get('pretrained', None):
+        attn = instantiate(cfg.model.attention_layer)
+        model = get_class(cfg.model._target_).from_pretrained(ckpt, attention_layer=attn)
+    else:
+        model = instantiate(cfg.model)
     if p:=cfg.training.get("pretrained_path"):
         log.info(f"Loading pretrained weights from {p}")
         model = load_pretrained(model, p)

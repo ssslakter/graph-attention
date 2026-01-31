@@ -1,6 +1,6 @@
 # @package _global_
 dataset:
-  variant: imagenette
-  root: data
+  variant: imagenet
+  root: /datasets/ImageNet/ILSVRC2012
   channels: 3
   augmentation: strong

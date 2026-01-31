@@ -48,30 +48,36 @@ class AGFAttention(nn.Module):
         self.to_out = nn.Linear(inner, dim, bias=True)
 
         # Coefficients
-        self.alphas_raw = nn.Parameter(torch.randn(order, num_heads))
+        self.alphas_raw = nn.Parameter(torch.empty(order, num_heads))
         self.act = self._act_map.get(alphas_act.lower(), lambda x: x)
 
         # State keys for regularization (ephemeral dict is risky for DDP/JIT, used properties)
         self.register_buffer("last_adj", None, persistent=False)
         self.register_buffer("last_x", None, persistent=False)
-        self.init_as_standard_attention()
+        self.reset_parameters()
     
     @property
     def alphas(self):
         return self.act(self.alphas_raw)
 
     @torch.no_grad()
-    def init_as_standard_attention(self):
-        if self.alphas_act_name == "sigmoid":
-            zero_val, one_val = -10.0, 10.0
-        elif self.alphas_act_name == "tanh":
-            zero_val, one_val = 0.0, 10.0
-        elif self.alphas_act_name == "softmax":
-            zero_val, one_val = -10.0, 10.0 
+    def reset_parameters(self):
+        """
+        Initializes alpha coefficients with a decay factor to prevent 
+        vanishing gradients and focus initially on low-order terms.
+        """
+        indices = torch.arange(self.order, device=self.alphas_raw.device).float()
+        
+        if self.alphas_act_name == "softmax":
+            init_values = torch.exp(-indices) # [1.0, 0.36, 0.13, ...]
+        elif self.alphas_act_name in ["sigmoid", "tanh"]:
+            init_values = 0.5 * torch.exp(-indices) 
         else:
-            zero_val, one_val = 0.0, 1.0
-        self.alphas_raw.fill_(zero_val)
-        self.alphas_raw[0].fill_(one_val)
+            init_values = torch.ones(self.order) / self.order
+
+        init_values = init_values.unsqueeze(-1).repeat(1, self.num_heads)
+        self.alphas_raw.copy_(init_values)
+        
         return self
 
     def forward(self, x, mask=None):

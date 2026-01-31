@@ -1,0 +1,55 @@
+# @package _global_
+
+defaults:
+  - /model/layers@model.attention_layer: agf
+  - override /model: vit_tiny
+  - override /dataset: imagenet
+  - override /optimizer: adamw
+  - override /scheduler: cosine
+
+model:
+  _target_: graph_attention.models.vit.ViT
+  pretrained: vit_tiny_patch16_224
+  attention_layer:
+    top_k: null
+    order: 2
+    basis: monomial
+    alphas_act: softmax
+    
+
+# Optimization Parameters
+optimizer:
+  lr: 1e-4
+  weight_decay: 0.05
+
+training:
+  epochs: 30
+  use_amp: true
+  grad_clip: null
+
+
+dataset:
+  augmentation: standard
+
+dataloader:
+  batch_size: 256
+  valid_batch_size: 512
+  num_workers: 1
+
+
+hooks:
+  ema:
+    enabled: false
+  
+  metrics:
+    metrics:
+      - _target_: graph_attention.training.metrics.LayerActivationStats
+        freq: 1000
+      - _target_: trainer_tools.hooks.metrics.Loss
+      - _target_: trainer_tools.hooks.metrics.Accuracy
+      - _target_: trainer_tools.hooks.metrics.LRStats
+  checkpoint:
+    save_every_steps: 3000
+    keep_last: 3
+
+run: imagenet_tiny_o${model.attention_layer.order}_act_${model.attention_layer.alphas_act}/${now:%Y-%m-%d_%H-%M-%S}
