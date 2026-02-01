@@ -91,7 +91,7 @@ class AttnResNet(nn.Module):
         return self.fc(x)
 
     @classmethod
-    def load_from_timm(cls, model_name, num_classes=1000):
+    def load_from_timm(cls, model_name, num_classes=1000, pretrained=False):
         # Configuration mapping for common models
         configs = {
             "resnet18": {"block": BasicBlock, "layers": [2, 2, 2, 2]},
@@ -109,7 +109,7 @@ class AttnResNet(nn.Module):
 
         # 2. Grab weights from timm
         print(f"Fetching pretrained weights for {model_name}...")
-        timm_model = timm.create_model(model_name, pretrained=True, num_classes=num_classes)
+        timm_model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
 
         # 3. Load state dict
         model.load_state_dict(timm_model.state_dict())
