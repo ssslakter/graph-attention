@@ -39,7 +39,7 @@ hooks:
     metric_name: valid_loss
 
   ema:
-    enabled: true
+    enabled: false
     _target_: trainer_tools.hooks.EMAHook
     decay: 0.9999
   
