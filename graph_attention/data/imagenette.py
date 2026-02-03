@@ -1,10 +1,11 @@
-import torchvision.transforms as tfm
+from torchvision.transforms import v2
 from torchvision.datasets import Imagenette as TVImagenette
 from .utils import register_dataset
+import torch
 
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
-SIZE = 224  # Standard ViT/ImageNet size
+SIZE = 224
 
 
 class ImagenetteAdapter(TVImagenette):
@@ -18,26 +19,34 @@ class ImagenetteAdapter(TVImagenette):
         super().__init__(root=root, split=split, download=download, transform=transform, **kwargs)
 
 
-def _imagenette_transform_factory(train: bool, augmentation: str, normalize: bool):
-    normalization = [tfm.Normalize(MEAN, STD)] if normalize else []
+def _imagenette_transform_factory(train: bool, augmentation: str, part: str):
+    if part == "cpu":
+        if not train or augmentation == "none":
+            return v2.Compose([v2.Resize(256), v2.CenterCrop(SIZE), v2.ToImage(), v2.ToDtype(torch.uint8, scale=False)])
 
-    if not train:
-        return tfm.Compose([tfm.Resize(256), tfm.CenterCrop(SIZE), tfm.ToTensor()] + normalization)
+        return v2.Compose(
+            [v2.RandomResizedCrop(SIZE, scale=(0.08, 1.0)), v2.ToImage(), v2.ToDtype(torch.uint8, scale=False)]
+        )
 
-    aug_strategies = {
-        "none": [tfm.Resize(256), tfm.CenterCrop(SIZE)],
-        "standard": [tfm.RandomResizedCrop(SIZE, scale=(0.08, 1.0)), tfm.RandomHorizontalFlip()],
-        "strong": [
-            tfm.RandomResizedCrop(SIZE, scale=(0.08, 1.0)),
-            tfm.RandomHorizontalFlip(),
-            tfm.RandAugment(num_ops=2, magnitude=9),
-        ],
-    }
+    if part == "gpu":
+        if not train:
+            return None
 
-    if augmentation not in aug_strategies:
-        raise ValueError(f"Unknown augmentation: {augmentation}")
+        aug_strategies = {
+            "none": [],
+            "standard": [v2.RandomHorizontalFlip()],
+            "strong": [
+                v2.RandomHorizontalFlip(),
+                v2.RandAugment(num_ops=2, magnitude=9),
+            ],
+        }
 
-    return tfm.Compose(aug_strategies[augmentation] + [tfm.ToTensor()] + normalization)
+        if augmentation not in aug_strategies:
+            raise ValueError(f"Unknown augmentation: {augmentation}")
+
+        return v2.Compose(aug_strategies[augmentation])
+
+    raise ValueError(f"Unknown part: {part}")
 
 
 register_dataset(

@@ -1,0 +1,48 @@
+# @package _global_
+
+defaults:
+  - override /model: resnet
+  - override /dataset: imagenette
+  - override /optimizer: adamw
+  - override /scheduler: cosine
+
+model:
+  pretrained: resnet18
+  attn_layer_indices: []
+
+torch:
+  compile: false
+  matmul_precision: high
+
+training:
+  seed: 42
+  epochs: 10
+  use_amp: false
+  grad_clip: null
+
+dataset:
+  augmentation: standard
+
+dataloader:
+  batch_size: 128
+  valid_batch_size: 256
+
+hooks:
+  checkpoint:
+    enabled: true
+  
+  ema:
+    enabled: false
+  
+  metrics:
+    enabled: true
+    metrics:
+      - _target_: trainer_tools.hooks.metrics.Loss
+      - _target_: trainer_tools.hooks.metrics.Accuracy
+      - _target_: trainer_tools.hooks.metrics.LRStats
+    tracker_type: trackio
+    project: resnet18-attn
+
+prefix: resnet18_attn
+suffix: ${now:%H-%M-%S}
+run: ${prefix}/${now:%Y-%m-%d}/${suffix}

@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  _target_: graph_attention.models.attn_resnet.AttnResNet
+  pretrained: resnet18
+  num_classes: 10

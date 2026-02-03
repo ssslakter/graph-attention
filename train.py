@@ -99,9 +99,16 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
 
     if cfg.training.get("grad_clip"):
         hooks.append(GradClipHook(max_norm=cfg.training.grad_clip))
-    
+
     if cfg.training.get("init_step"):
         hooks.append(StepInitHook(cfg.training.init_step))
+
+    batch_tfms = get_batch_transforms(
+        cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True
+    )
+    valid_batch_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
+    print(batch_tfms, valid_batch_tfms)
+    hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
 
 
 def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
@@ -132,12 +139,36 @@ def main(cfg: DictConfig):
     with open_dict(cfg):
         cfg.model.num_classes = len(train_dataloader.dataset.classes)
         cfg.model.channels = cfg.dataset.channels
-    if ckpt:=cfg.model.get('pretrained', None):
+
+    # Handle different model loading strategies
+    pretrained = cfg.model.get("pretrained", None)
+    model_cls = get_class(cfg.model._target_)
+
+    if pretrained and isinstance(pretrained, str) and hasattr(model_cls, "load_from_timm"):
+        # Load model using timm (e.g., AttnResNet with pretrained="resnet18")
+        timm_kwargs = {
+            "model_name": pretrained,
+            "num_classes": cfg.model.num_classes,
+            "pretrained": True,
+        }
+        # Add any extra kwargs from config except reserved keys
+        extra_kwargs = {
+            k: v
+            for k, v in OmegaConf.to_container(cfg.model, resolve=True).items()
+            if k not in ["_target_", "pretrained", "num_classes", "channels"]
+        }
+        timm_kwargs.update(extra_kwargs)
+        log.info(f"Loading model from timm: {pretrained}")
+        model = model_cls.load_from_timm(**timm_kwargs)
+    elif pretrained and hasattr(model_cls, "from_pretrained"):
+        # Load using from_pretrained method (e.g., ViT)
         attn = instantiate(cfg.model.attention_layer)
-        model = get_class(cfg.model._target_).from_pretrained(ckpt, attention_layer=attn)
+        model = model_cls.from_pretrained(pretrained, attention_layer=attn)
     else:
+        # Standard instantiation
         model = instantiate(cfg.model)
-    if p:=cfg.training.get("pretrained_path"):
+
+    if p := cfg.training.get("pretrained_path"):
         log.info(f"Loading pretrained weights from {p}")
         model = load_pretrained(model, p)
 
