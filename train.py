@@ -144,12 +144,16 @@ def main(cfg: DictConfig):
     pretrained = cfg.model.get("pretrained", None)
     model_cls = get_class(cfg.model._target_)
 
-    if pretrained and isinstance(pretrained, str) and hasattr(model_cls, "load_from_timm"):
-        # Load model using timm (e.g., AttnResNet with pretrained="resnet18")
+    if hasattr(model_cls, "load_from_timm"):
+        
         timm_kwargs = {
             "model_name": pretrained,
             "num_classes": cfg.model.num_classes,
             "pretrained": True,
+        } if pretrained and isinstance(pretrained, str) else {
+            "model_name": cfg.model.get("model_name", "resnet18"),
+            "num_classes": cfg.model.num_classes,
+            "pretrained": False,
         }
         # Add any extra kwargs from config except reserved keys
         extra_kwargs = {

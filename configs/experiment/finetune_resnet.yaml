@@ -7,7 +7,7 @@ defaults:
   - override /scheduler: cosine
 
 model:
-  pretrained: resnet18
+  pretrained: null
   attn_layer_indices: []
 
 torch:
@@ -16,7 +16,7 @@ torch:
 
 training:
   seed: 42
-  epochs: 10
+  epochs: 15
   use_amp: false
   grad_clip: null
 
@@ -45,4 +45,4 @@ hooks:
 
 prefix: resnet18_attn
 suffix: ${now:%H-%M-%S}
-run: ${prefix}/${now:%Y-%m-%d}/${suffix}
+run: pretrain_${prefix}
