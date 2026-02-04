@@ -27,6 +27,42 @@ def load_pretrained(model: torch.nn.Module, pretrained_path: str):
     
     return model
 
+
+class PrefetchLoader:
+    """
+    Prefetches data to GPU using a separate CUDA stream to overlap data transfer with computation.
+    """
+    def __init__(self, loader, device):
+        self.loader = loader
+        self.device = device
+
+    def __iter__(self):
+        stream = torch.cuda.Stream()
+        first = True
+        xb, yb = None, None
+
+        for next_xb, next_yb in self.loader:
+            with torch.cuda.stream(stream):
+                next_xb = next_xb.to(self.device, non_blocking=True)
+                next_yb = next_yb.to(self.device, non_blocking=True)
+
+            if not first:
+                yield xb, yb
+            else:
+                first = False
+
+            torch.cuda.current_stream().wait_stream(stream)
+            xb, yb = next_xb, next_yb
+
+        yield xb, yb
+
+    def __len__(self):
+        return len(self.loader)
+
+    def __getattr__(self, name):
+        """Delegate attribute access to the underlying loader."""
+        return getattr(self.loader, name)
+
 class StepInitHook(BaseHook):
     ord = -30
     def __init__(self, start_step: int):

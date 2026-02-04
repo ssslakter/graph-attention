@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
-from graph_attention.training.utils import StepInitHook, load_pretrained
+from graph_attention.training.utils import StepInitHook, load_pretrained, PrefetchLoader
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 log = logging.getLogger(__name__)
@@ -107,7 +107,6 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
         cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True
     )
     valid_batch_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
-    print(batch_tfms, valid_batch_tfms)
     hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
 
 
@@ -178,7 +177,15 @@ def main(cfg: DictConfig):
 
     torch.set_float32_matmul_precision(cfg.torch.get("matmul_precision", "high"))
     model = torch.compile(model) if cfg.torch.get("compile", False) else model
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs!")
+        model = nn.DataParallel(model)
+        
     optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
+
+    device = torch.device("cuda")
+    train_dataloader = PrefetchLoader(train_dataloader, device)
+    test_dataloader = PrefetchLoader(test_dataloader, device)
 
     hooks = build_hooks(cfg.hooks, config=cfg)
     add_training_hooks(hooks, scheduler, cfg)

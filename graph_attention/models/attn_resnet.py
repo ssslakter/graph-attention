@@ -158,12 +158,17 @@ class AttnResNet(nn.Module):
 
         # 1. Create our custom model
         config = configs[model_name]
+        
+        # Extract only the valid __init__ parameters
+        valid_params = {'in_chans', 'region_size'}
+        init_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
+        
         model = cls(
             block=config["block"],
             layers=config["layers"],
             attn_layer_indices=attn_layer_indices,
             num_classes=num_classes,
-            **kwargs,
+            **init_kwargs,
         )
 
         # 2. Grab weights from timm

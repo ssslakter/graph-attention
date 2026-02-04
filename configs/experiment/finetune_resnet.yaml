@@ -2,13 +2,18 @@
 
 defaults:
   - override /model: resnet
-  - override /dataset: imagenette
+  - override /dataset: imagenet
   - override /optimizer: adamw
   - override /scheduler: cosine
 
 model:
-  pretrained: null
+  pretrained: resnet18
   attn_layer_indices: []
+
+optimizer:
+  lr: 1e-4
+  weight_decay: 0.05
+  fused: true
 
 torch:
   compile: false
@@ -16,26 +21,31 @@ torch:
 
 training:
   seed: 42
-  epochs: 15
-  use_amp: false
-  grad_clip: null
+  epochs: 30
+  use_amp: true
+  grad_clip: 1.0
 
 dataset:
   augmentation: standard
 
 dataloader:
-  batch_size: 128
-  valid_batch_size: 256
+  batch_size: 1024
+  valid_batch_size: 1024
+  num_workers: 10
+  pin_memory: true
+  persistent_workers: true
 
 hooks:
   checkpoint:
     enabled: true
+    save_every_steps: 20000
   
   ema:
     enabled: false
   
   metrics:
     enabled: true
+    verbose: true
     metrics:
       - _target_: trainer_tools.hooks.metrics.Loss
       - _target_: trainer_tools.hooks.metrics.Accuracy
@@ -43,6 +53,6 @@ hooks:
     tracker_type: trackio
     project: resnet18-attn
 
-prefix: resnet18_attn
-suffix: ${now:%H-%M-%S}
-run: pretrain_${prefix}
+prefix: resnet18
+suffix: ${now:%Y-%m-%d_%H-%M-%S}
+run: ${prefix}/${suffix}
