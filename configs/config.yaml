@@ -13,7 +13,6 @@ dataloader:
   num_workers: 6
   persistent_workers: true
   pin_memory: true
-  prefetch_factor: 4
 
 torch:
   compile: true

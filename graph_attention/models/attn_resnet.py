@@ -37,7 +37,7 @@ class ChannelAttentionResBlock(BasicBlock):
         self.k = region_size
         self.attend = nn.Softmax(dim=-1)
         self.to_qk = nn.Linear(self.k**2, self.k**2 * 2, bias=False)
-        # self.attn_scale = nn.Parameter(torch.tensor(1e-5))
+        self.attn_scale = nn.Parameter(torch.tensor(1e-5))
 
     def forward(self, x):
         identity = x
@@ -58,7 +58,7 @@ class ChannelAttentionResBlock(BasicBlock):
         out = torch.matmul(attn, x_flat)
 
         out = rearrange(out, "b c (h w) -> b c h w", h=h, w=w)
-        # out = (1 - self.attn_scale) * x + (self.attn_scale * out)
+        out = (1 - self.attn_scale) * x + (self.attn_scale * out)
 
         out = self.relu(self.bn1(self.conv1(out)))
         out = self.bn2(self.conv2(out))

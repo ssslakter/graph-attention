@@ -8,7 +8,8 @@ defaults:
 
 model:
   pretrained: resnet18
-  attn_layer_indices: []
+  attn_layer_indices: [2,3]
+  region_size: 16
 
 optimizer:
   lr: 1e-4
@@ -29,16 +30,17 @@ dataset:
   augmentation: standard
 
 dataloader:
-  batch_size: 1024
-  valid_batch_size: 1024
+  batch_size: 256
+  valid_batch_size: 256
   num_workers: 10
   pin_memory: true
   persistent_workers: true
+  prefetch_factor: 1
 
 hooks:
   checkpoint:
     enabled: true
-    save_every_steps: 20000
+    save_every_steps: 5000
   
   ema:
     enabled: false
@@ -55,4 +57,4 @@ hooks:
 
 prefix: resnet18
 suffix: ${now:%Y-%m-%d_%H-%M-%S}
-run: ${prefix}/${suffix}
+run: ${prefix}_attn_l3,4/${suffix}

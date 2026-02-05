@@ -8,6 +8,9 @@ from graph_attention.data import get_dataset, get_transforms, get_batch_transfor
 from graph_attention.training.utils import StepInitHook, load_pretrained, PrefetchLoader
 from graph_attention.training.trainer import GraphAttentionTrainer
 
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 log = logging.getLogger(__name__)
 
 
@@ -29,11 +32,17 @@ def _build_datasets_and_loaders(cfg: DictConfig):
         shuffle=True,
         **dl_cfg,
     )
+
+    val_dl_cfg = dl_cfg.copy()
+    val_dl_cfg["persistent_workers"] = False
+    val_dl_cfg["prefetch_factor"] = 2
+    val_dl_cfg["num_workers"] = 4
+
     valid_dl = DataLoader(
         get_dataset(cfg.dataset.variant, cfg.dataset.root, train=False),
         batch_size=valid_bs,
         shuffle=False,
-        **dl_cfg,
+        **val_dl_cfg,
     )
 
     return train_dl, valid_dl
@@ -121,7 +130,7 @@ def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
         train_dl=train_dl,
         valid_dl=valid_dl,
         optim=optimizer,
-        loss_func=torch.nn.CrossEntropyLoss(label_smoothing=0.1),
+        loss_func=torch.nn.CrossEntropyLoss(label_smoothing=cfg.training.get("label_smoothing", 0.0)),
         epochs=cfg.training.epochs,
         hooks=[h for h in hooks if h],
         config=cfg,
