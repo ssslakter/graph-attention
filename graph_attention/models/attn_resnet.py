@@ -35,8 +35,11 @@ class ChannelAttentionResBlock(BasicBlock):
         super().__init__(inplanes, planes, stride, downsample)
         self.gamma = 10
         self.k = region_size
+        self.k2 = self.k**2
         self.attend = nn.Softmax(dim=-1)
+        self.ln = nn.LayerNorm(self.k2)
         self.to_qk = nn.Linear(self.k**2, self.k**2 * 2, bias=False)
+        nn.init.xavier_uniform_(self.to_qk.weight)
         self.attn_scale = nn.Parameter(torch.tensor(1e-5))
 
     def forward(self, x):
@@ -49,6 +52,7 @@ class ChannelAttentionResBlock(BasicBlock):
         z = F.adaptive_avg_pool2d(x, (self.k, self.k))
         z = rearrange(z, "b c k1 k2 -> b c (k1 k2)")
 
+        z = self.ln(z)
         qk = self.to_qk(z).chunk(2, dim=-1)
         q, k = qk
 
@@ -58,7 +62,7 @@ class ChannelAttentionResBlock(BasicBlock):
         out = torch.matmul(attn, x_flat)
 
         out = rearrange(out, "b c (h w) -> b c h w", h=h, w=w)
-        out = (1 - self.attn_scale) * x + (self.attn_scale * out)
+        out = x + self.attn_scale * out
 
         out = self.relu(self.bn1(self.conv1(out)))
         out = self.bn2(self.conv2(out))
