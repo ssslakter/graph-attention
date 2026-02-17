@@ -2,7 +2,7 @@
 
 defaults:
   - override /model: resnet
-  - override /dataset: imagenet
+  - override /dataset: imagenette
   - override /optimizer: adamw
   - override /scheduler: cosine
 
@@ -12,7 +12,7 @@ model:
   region_size: 16
 
 optimizer:
-  lr: 1e-4
+  lr: 8e-4
   weight_decay: 0.05
   fused: true
 
@@ -32,7 +32,7 @@ dataset:
 dataloader:
   batch_size: 256
   valid_batch_size: 256
-  num_workers: 10
+  num_workers: 4
   pin_memory: true
   persistent_workers: true
   prefetch_factor: 1

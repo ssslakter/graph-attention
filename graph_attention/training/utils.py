@@ -62,17 +62,3 @@ class PrefetchLoader:
     def __getattr__(self, name):
         """Delegate attribute access to the underlying loader."""
         return getattr(self.loader, name)
-
-class StepInitHook(BaseHook):
-    ord = -30
-    def __init__(self, start_step: int):
-        self.start_step = start_step
-    
-    def before_fit(self, trainer: Trainer):
-        trainer.epochs = trainer.epochs + self.start_step // len(trainer.train_dl)
-        trainer.start_epoch = self.start_step // len(trainer.train_dl)
-
-    def before_epoch(self, trainer: Trainer):
-        # TODO, this should be before fit, but progress bar uses it in some wierd way
-        if trainer.step == 0:
-            trainer.step = self.start_step
