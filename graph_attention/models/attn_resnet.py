@@ -47,25 +47,23 @@ class ChannelAttentionResBlock(BasicBlock):
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        b, c, h, w = x.shape
 
-        z = F.adaptive_avg_pool2d(x, (self.k, self.k))
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        
+        b, c, h, w = out.shape
+
+        z = F.adaptive_avg_pool2d(out, (self.k, self.k))
         z = rearrange(z, "b c k1 k2 -> b c (k1 k2)")
-
         z = self.ln(z)
         qk = self.to_qk(z).chunk(2, dim=-1)
         q, k = qk
 
         attn = self.attend(torch.matmul(q, k.transpose(-1, -2)) / self.k)
-
-        x_flat = rearrange(x, "b c h w -> b c (h w)")
+        x_flat = rearrange(out, "b c h w -> b c (h w)")
         out = torch.matmul(attn, x_flat)
-
         out = rearrange(out, "b c (h w) -> b c h w", h=h, w=w)
-        out = x + self.attn_scale * out
-
-        out = self.relu(self.bn1(self.conv1(out)))
-        out = self.bn2(self.conv2(out))
+        out = out + self.attn_scale * out
 
         return self.relu(out + identity)
 

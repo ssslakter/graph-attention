@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
-from graph_attention.training.utils import StepInitHook, load_pretrained, PrefetchLoader
+from graph_attention.training.utils import StepInitHook, load_pretrained
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -192,9 +192,6 @@ def main(cfg: DictConfig):
         
     optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
 
-    device = torch.device("cuda")
-    train_dataloader = PrefetchLoader(train_dataloader, device)
-    test_dataloader = PrefetchLoader(test_dataloader, device)
 
     hooks = build_hooks(cfg.hooks, config=cfg)
     add_training_hooks(hooks, scheduler, cfg)

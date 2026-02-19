@@ -13,7 +13,6 @@ from trainer_tools.all import (
 )
 from trainer_tools.hooks.metrics import Loss, Accuracy, LRStats
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
-from graph_attention.training.utils import PrefetchLoader
 from graph_attention.models.attn_resnet import AttnResNet
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
