@@ -227,7 +227,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d2/f3/41b1caf95a9a756614efb729de2d9702896f0e872eb0fa4cdd80490faf16/trackio-0.16.0-py3-none-any.whl
       - pypi: git+https://github.com/ssslakter/trackio_ui.git#8c23c398643856e870ad9e8df24dcb02e604ada8
-      - pypi: git+https://github.com/ssslakter/trainer-tools.git#35d1549800007eaa319f7ee123b6db895fb09bb3
+      - pypi: git+https://github.com/ssslakter/trainer-tools.git#8f622b65debc135a142127f687ff063405b2591d
       - pypi: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/46/8c3bbb5b0a19313f50edcaa363b599e5a1a5ac9683ead82b9b80fe497c8d/triton-3.5.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/85/d0/4da85c2a45054bb661993c93524138ace4956cb075a7ae0c9d1deadc331b/typer-0.24.0-py3-none-any.whl
@@ -445,7 +445,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d2/f3/41b1caf95a9a756614efb729de2d9702896f0e872eb0fa4cdd80490faf16/trackio-0.16.0-py3-none-any.whl
       - pypi: git+https://github.com/ssslakter/trackio_ui.git#8c23c398643856e870ad9e8df24dcb02e604ada8
-      - pypi: git+https://github.com/ssslakter/trainer-tools.git#35d1549800007eaa319f7ee123b6db895fb09bb3
+      - pypi: git+https://github.com/ssslakter/trainer-tools.git#8f622b65debc135a142127f687ff063405b2591d
       - pypi: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/85/d0/4da85c2a45054bb661993c93524138ace4956cb075a7ae0c9d1deadc331b/typer-0.24.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a7/24/5480c20380dfd18cf33d14784096dca45a24eae6102e91d49a718d3b6855/typer_slim-0.24.0-py3-none-any.whl
@@ -666,7 +666,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d2/f3/41b1caf95a9a756614efb729de2d9702896f0e872eb0fa4cdd80490faf16/trackio-0.16.0-py3-none-any.whl
       - pypi: git+https://github.com/ssslakter/trackio_ui.git#8c23c398643856e870ad9e8df24dcb02e604ada8
-      - pypi: git+https://github.com/ssslakter/trainer-tools.git#35d1549800007eaa319f7ee123b6db895fb09bb3
+      - pypi: git+https://github.com/ssslakter/trainer-tools.git#8f622b65debc135a142127f687ff063405b2591d
       - pypi: https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/85/d0/4da85c2a45054bb661993c93524138ace4956cb075a7ae0c9d1deadc331b/typer-0.24.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a7/24/5480c20380dfd18cf33d14784096dca45a24eae6102e91d49a718d3b6855/typer_slim-0.24.0-py3-none-any.whl
@@ -5492,7 +5492,7 @@ packages:
   - pyarrow
   - trackio
   requires_python: '>=3.11'
-- pypi: git+https://github.com/ssslakter/trainer-tools.git#35d1549800007eaa319f7ee123b6db895fb09bb3
+- pypi: git+https://github.com/ssslakter/trainer-tools.git#8f622b65debc135a142127f687ff063405b2591d
   name: trainer-tools
   version: 0.2.0
   requires_dist:
