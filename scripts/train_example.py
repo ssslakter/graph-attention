@@ -74,96 +74,99 @@ torch.set_float32_matmul_precision(TORCH_MATMUL_PRECISION)
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-# --- Data Loading ---
-train_transforms = get_transforms(DATASET_VARIANT, train=True, augmentation=DATASET_AUGMENTATION)
-train_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=True, transforms=train_transforms)
 
-train_dataloader = DataLoader(
-    train_dataset,
-    batch_size=DATALOADER_BATCH_SIZE,
-    shuffle=True,
-    num_workers=DATALOADER_NUM_WORKERS,
-    pin_memory=DATALOADER_PIN_MEMORY,
-    persistent_workers=DATALOADER_PERSISTENT_WORKERS,
-    prefetch_factor=DATALOADER_PREFETCH_FACTOR,
-)
+def main():
+    # --- Data Loading ---
+    train_transforms = get_transforms(DATASET_VARIANT, train=True, augmentation=DATASET_AUGMENTATION)
+    train_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=True, transforms=train_transforms)
 
-valid_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=False)
-valid_dataloader = DataLoader(
-    valid_dataset,
-    batch_size=DATALOADER_VALID_BATCH_SIZE,
-    shuffle=False,
-    num_workers=4,
-    pin_memory=DATALOADER_PIN_MEMORY,
-    persistent_workers=False,
-    prefetch_factor=2,
-)
-
-# --- Model ---
-model = AttnResNet.load_from_timm(
-    model_name=MODEL_PRETRAINED,
-    num_classes=MODEL_NUM_CLASSES,
-    pretrained=True,
-    attn_layer_indices=MODEL_ATTN_LAYER_INDICES,
-    region_size=MODEL_REGION_SIZE,
-)
-
-if torch.cuda.device_count() > 1:
-    print(f"Using {torch.cuda.device_count()} GPUs!")
-    model = nn.DataParallel(model)
-
-if TORCH_COMPILE:
-    model = torch.compile(model)
-
-optimizer = AdamW(model.parameters(), lr=OPTIMIZER_LR, weight_decay=OPTIMIZER_WEIGHT_DECAY, fused=OPTIMIZER_FUSED)
-
-total_steps = len(train_dataloader) * TRAINING_EPOCHS
-scheduler = CosineAnnealingLR(optimizer, T_max=int(total_steps * SCHEDULER_T_MAX_FACTOR))
-
-
-# --- Hooks ---
-hooks = []
-hooks.insert(0, ProgressBarHook())
-hooks.append(LRSchedulerHook(scheduler))
-
-if TRAINING_USE_AMP:
-    hooks.append(AMPHook(dtype=TRAINING_AMP_DTYPE, device_type=TRAINING_DEVICE))
-if TRAINING_GRAD_CLIP:
-    hooks.append(GradClipHook(max_norm=TRAINING_GRAD_CLIP))
-
-batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
-valid_batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
-hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
-
-hooks.append(CheckpointHook("outputs/test/checkpoints", save_every_steps=5000))
-hooks.append(
-    MetricsHook(
-        verbose=True,
-        metrics=[
-            Loss(),
-            Accuracy(),
-            LRStats(),
-        ],
-        tracker_type="trackio",
-        project="resnet18-attn",
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=DATALOADER_BATCH_SIZE,
+        shuffle=True,
+        num_workers=DATALOADER_NUM_WORKERS,
+        pin_memory=DATALOADER_PIN_MEMORY,
+        persistent_workers=DATALOADER_PERSISTENT_WORKERS,
+        prefetch_factor=DATALOADER_PREFETCH_FACTOR,
     )
-)
 
-# --- Trainer ---
-trainer = Trainer(
-    model=model,
-    train_dl=train_dataloader,
-    valid_dl=valid_dataloader,
-    optim=optimizer,
-    loss_func=torch.nn.CrossEntropyLoss(label_smoothing=TRAINING_LABEL_SMOOTHING),
-    epochs=TRAINING_EPOCHS,
-    hooks=hooks,
-)
+    valid_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=False)
+    valid_dataloader = DataLoader(
+        valid_dataset,
+        batch_size=DATALOADER_VALID_BATCH_SIZE,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=DATALOADER_PIN_MEMORY,
+        persistent_workers=False,
+        prefetch_factor=2,
+    )
 
-# --- Training ---
-print("Starting training...")
-try:
-    trainer.fit()
-    print("Training complete!")
-except KeyboardInterrupt:
-    print("\nTraining interrupted by user.")
+    # --- Model ---
+    model = AttnResNet.load_from_timm(
+        model_name=MODEL_PRETRAINED,
+        num_classes=MODEL_NUM_CLASSES,
+        pretrained=True,
+        attn_layer_indices=MODEL_ATTN_LAYER_INDICES,
+        region_size=MODEL_REGION_SIZE,
+    )
+
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs!")
+        model = nn.DataParallel(model)
+
+    if TORCH_COMPILE:
+        model = torch.compile(model)
+
+    optimizer = AdamW(model.parameters(), lr=OPTIMIZER_LR, weight_decay=OPTIMIZER_WEIGHT_DECAY, fused=OPTIMIZER_FUSED)
+
+    total_steps = len(train_dataloader) * TRAINING_EPOCHS
+    scheduler = CosineAnnealingLR(optimizer, T_max=int(total_steps * SCHEDULER_T_MAX_FACTOR))
+
+    # --- Hooks ---
+    hooks = []
+    hooks.insert(0, ProgressBarHook())
+    hooks.append(LRSchedulerHook(scheduler))
+
+    if TRAINING_USE_AMP:
+        hooks.append(AMPHook(dtype=TRAINING_AMP_DTYPE, device_type=TRAINING_DEVICE))
+    if TRAINING_GRAD_CLIP:
+        hooks.append(GradClipHook(max_norm=TRAINING_GRAD_CLIP))
+
+    batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
+    valid_batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
+    hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
+
+    hooks.append(CheckpointHook("outputs/test/checkpoints", save_every_steps=5000))
+    hooks.append(
+        MetricsHook(
+            verbose=True,
+            metrics=[
+                Loss(),
+                Accuracy(),
+                LRStats(),
+            ],
+            tracker_type="trackio",
+            project="resnet18-attn",
+        )
+    )
+
+    # --- Trainer ---
+    trainer = Trainer(
+        model=model,
+        train_dl=train_dataloader,
+        valid_dl=valid_dataloader,
+        optim=optimizer,
+        loss_func=torch.nn.CrossEntropyLoss(label_smoothing=TRAINING_LABEL_SMOOTHING),
+        epochs=TRAINING_EPOCHS,
+        hooks=hooks,
+    )
+    print("Starting training...")
+    try:
+        trainer.fit()
+        print("Training complete!")
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user.")
+
+
+if __name__ == "__main__":
+    main()

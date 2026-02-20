@@ -24,16 +24,20 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [tool.pixi.workspace]
-channels = ["conda-forge"]
+channels = ["pytorch","conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64"]
 
 [tool.pixi.target.osx-64.dependencies] 
 # torch for old macs is only available for python <3.13
 python = "<3.13"
+[tool.pixi.target.osx-64.pypi-dependencies] 
+torch = { version = "*", index = "https://download.pytorch.org/whl/cpu"}
+
+[tool.pixi.target.win-64.pypi-dependencies]
+torch = { version = "*", index = "https://download.pytorch.org/whl/cu130"}
 
 [tool.pixi.pypi-dependencies]
 graph_attention = { path = ".", editable = true }
-
 
 [tool.hatch.metadata]
 allow-direct-references = true
