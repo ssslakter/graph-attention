@@ -1,4 +1,5 @@
 import hydra, logging, json, torch
+import sys
 from hydra.utils import instantiate, get_class
 from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
@@ -13,6 +14,35 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 log = logging.getLogger(__name__)
+
+def _can_use_torch_compile() -> bool:
+    try:
+        import triton  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def _default_compile_backend() -> str:
+    if sys.platform.startswith("linux"):
+        return "inductor"
+    if sys.platform.startswith("win"):
+        return "eager"
+    if sys.platform == "darwin":
+        return "eager"
+    return "eager"
+
+
+def _resolve_compile_backend(cfg: DictConfig):
+    if not cfg.torch.get("compile", False):
+        return None
+
+    backend = cfg.torch.get("compile_backend", None)
+    if backend is None:
+        backend = _default_compile_backend()
+    if isinstance(backend, str) and backend.lower() in {"none", "null", "false", "disable", "off"}:
+        return None
+    return backend
 
 
 def _build_datasets_and_loaders(cfg: DictConfig):
@@ -202,7 +232,15 @@ def main(cfg: DictConfig):
         model = load_pretrained(model, p)
 
     torch.set_float32_matmul_precision(cfg.torch.get("matmul_precision", "high"))
-    model = torch.compile(model) if cfg.torch.get("compile", False) else model
+    backend = _resolve_compile_backend(cfg)
+    if backend:
+        if backend == "inductor" and not _can_use_torch_compile():
+            log.warning("torch.compile backend 'inductor' requested but Triton is unavailable. Falling back to eager.")
+            backend = "eager"
+        try:
+            model = torch.compile(model, backend=backend)
+        except Exception as e:
+            log.warning(f"torch.compile failed (backend={backend}). Continuing without compilation. Error: {e}")
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
         model = nn.DataParallel(model)
