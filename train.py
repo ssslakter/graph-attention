@@ -4,8 +4,9 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
-from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
+from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
 from graph_attention.training.utils import load_pretrained
+from graph_attention.training.hooks import TrainValidBatchTransformHook
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -115,9 +116,20 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
         )
         # hooks.append(StepInitHook(cfg.training.init_step))
 
-    batch_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True)
-    valid_batch_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
-    hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
+    batch_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True)
+    valid_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
+    batch_label_tfms = get_batch_mixup_cutmix(
+        cfg.model.num_classes,
+        cfg.dataset.augmentation,
+        train=True,
+    )
+    hooks.append(
+        TrainValidBatchTransformHook(
+            x_tfm=batch_x_tfms,
+            x_tfms_valid=valid_x_tfms,
+            batch_tfms=batch_label_tfms,
+        )
+    )
 
 
 def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):

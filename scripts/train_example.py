@@ -7,16 +7,16 @@ from trainer_tools.all import (
     LRSchedulerHook,
     AMPHook,
     GradClipHook,
-    BatchTransformHook,
     CheckpointHook,
     MetricsHook,
 )
 from trainer_tools.hooks.metrics import Loss, Accuracy, LRStats
-from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
+from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
 from graph_attention.models.attn_resnet import AttnResNet
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from trainer_tools.utils import random_seed
+from graph_attention.training.hooks import TrainValidBatchTransformHook
 import logging
 
 # --- Configuration Constants ---
@@ -132,9 +132,16 @@ def main():
     if TRAINING_GRAD_CLIP:
         hooks.append(GradClipHook(max_norm=TRAINING_GRAD_CLIP))
 
-    batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
-    valid_batch_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
-    hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
+    batch_x_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
+    valid_x_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
+    batch_label_tfms = get_batch_mixup_cutmix(MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
+    hooks.append(
+        TrainValidBatchTransformHook(
+            x_tfm=batch_x_tfms,
+            x_tfms_valid=valid_x_tfms,
+            batch_tfms=batch_label_tfms,
+        )
+    )
 
     hooks.append(CheckpointHook("outputs/test/checkpoints", save_every_steps=5000))
     hooks.append(
