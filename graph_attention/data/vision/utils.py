@@ -43,12 +43,9 @@ def get_transforms(variant: str, train: bool = True, augmentation: str = "standa
     return info["transform_factory"](train, augmentation, "cpu")
 
 
-def get_batch_transforms(variant: str, num_classes: int, augmentation: str = "standard", train: bool = True):
+def get_batch_transforms(variant: str, augmentation: str = "standard", train: bool = True):
     """
-    Returns GPU-ready batch transforms (Augmentations, Float conversion, Normalize).
-
-    Note: MixUp/CutMix are batch-level transforms that require labels, so they are
-    intentionally excluded here. Use get_batch_mixup_cutmix for those.
+    Returns batch transforms for images
     """
     info = get_registry_info(variant)
     transforms = []

@@ -7,13 +7,13 @@ from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
 from graph_attention.training.utils import load_pretrained
-from graph_attention.training.hooks import TrainValidBatchTransformHook
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 log = logging.getLogger(__name__)
+
 
 def _can_use_torch_compile() -> bool:
     try:
@@ -26,11 +26,8 @@ def _can_use_torch_compile() -> bool:
 def _default_compile_backend() -> str:
     if sys.platform.startswith("linux"):
         return "inductor"
-    if sys.platform.startswith("win"):
+    else:
         return "eager"
-    if sys.platform == "darwin":
-        return "eager"
-    return "eager"
 
 
 def _resolve_compile_backend(cfg: DictConfig):
@@ -146,15 +143,15 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
         )
         # hooks.append(StepInitHook(cfg.training.init_step))
 
-    batch_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True)
-    valid_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
+    batch_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.dataset.augmentation, train=True)
+    valid_x_tfms = get_batch_transforms(cfg.dataset.variant, train=False)
     batch_label_tfms = get_batch_mixup_cutmix(
         cfg.model.num_classes,
         cfg.dataset.augmentation,
         train=True,
     )
     hooks.append(
-        TrainValidBatchTransformHook(
+        BatchTransformHook(
             x_tfm=batch_x_tfms,
             x_tfms_valid=valid_x_tfms,
             batch_tfms=batch_label_tfms,
@@ -267,7 +264,7 @@ def main(cfg: DictConfig):
         trainer.fit()
         log.info("Training complete!")
     except KeyboardInterrupt:
-        log.info("\nTraining interrupted by user.")
+        log.info("Training interrupted by user.")
 
 
 if __name__ == "__main__":

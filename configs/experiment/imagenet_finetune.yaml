@@ -46,7 +46,7 @@ hooks:
       - _target_: graph_attention.training.metrics.LayerActivationStats
         freq: 1000
       - _target_: trainer_tools.hooks.metrics.Loss
-      - _target_: graph_attention.training.metrics.Accuracy
+      - _target_: graph_attention.training.metrics.AccuracyMixup
       - _target_: trainer_tools.hooks.metrics.LRStats
   checkpoint:
     save_every_steps: 3000

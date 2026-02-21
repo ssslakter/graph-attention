@@ -1,8 +1,9 @@
 import torch
 from torch._dynamo import disable
-from trainer_tools.hooks.metrics import Metric
+from trainer_tools.hooks.metrics import Metric, Accuracy
 from ..models.layers import AGFAttention, Attention
 
+__all__ = ["LayerActivationStats", "AccuracyMixup"]
 
 class LayerActivationStats(Metric):
     """
@@ -71,21 +72,16 @@ class LayerActivationStats(Metric):
         return data
 
 
-class Accuracy(Metric):
-    def __init__(self, name="accuracy", freq=1, preds_key="logits"):
-        super().__init__(name, freq, phase="after_loss")
-        self.preds_key = preds_key
+class AccuracyMixup(Accuracy):
+    """Like accuracy, but supports mixed targets."""
 
     def __call__(self, trainer):
         target = trainer.get_target(trainer.batch)
-        if isinstance(target, torch.Tensor) and target.ndim > 1:
-            if target.size(1) == 1:
-                target = target.squeeze(1)
-            else:
-                target = target.argmax(dim=1)
-        elif isinstance(target, torch.Tensor) and target.dtype.is_floating_point:
-            target = target.long()
+        logits = trainer.preds["logits"] if isinstance(trainer.preds, dict) else trainer.preds
+        preds = logits.argmax(dim=1) if logits.ndim > 1 else (logits > 0)
 
-        logits = trainer.preds[self.preds_key] if isinstance(trainer.preds, dict) else trainer.preds
-        preds = logits.argmax(dim=1) if logits.ndim > 1 else (logits > 0.5)
-        return {self.name: (preds == target).float().mean().item()}
+        if target.ndim > 1: # handle mixed targets
+            acc = target.gather(1, preds.unsqueeze(1)).squeeze(1)
+        else:
+            acc = (preds == target).float()
+        return {self.name: acc.mean().item()}

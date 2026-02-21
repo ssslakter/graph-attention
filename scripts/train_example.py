@@ -9,6 +9,7 @@ from trainer_tools.all import (
     GradClipHook,
     CheckpointHook,
     MetricsHook,
+    BatchTransformHook
 )
 from trainer_tools.hooks.metrics import Loss, Accuracy, LRStats
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
@@ -16,7 +17,6 @@ from graph_attention.models.attn_resnet import AttnResNet
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from trainer_tools.utils import random_seed
-from graph_attention.training.hooks import TrainValidBatchTransformHook
 import logging
 
 # --- Configuration Constants ---
@@ -136,7 +136,7 @@ def main():
     valid_x_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
     batch_label_tfms = get_batch_mixup_cutmix(MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
     hooks.append(
-        TrainValidBatchTransformHook(
+        BatchTransformHook(
             x_tfm=batch_x_tfms,
             x_tfms_valid=valid_x_tfms,
             batch_tfms=batch_label_tfms,
