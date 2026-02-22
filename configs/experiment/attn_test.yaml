@@ -1,11 +1,11 @@
 # @package _global_
 
 defaults:
+  - /model/layers@model.attention_layer: attention
   - override /model: vit_base
   - override /dataset: cifar10
   - override /optimizer: adamw
   - override /scheduler: onecycle
-  - override /model/layers@model.attention_layer: attention
 
 optimizer:
   lr: 0.001

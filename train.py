@@ -1,17 +1,45 @@
 import hydra, logging, json, torch
+import sys
 from hydra.utils import instantiate, get_class
 from omegaconf import DictConfig, OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from trainer_tools.all import *
 from trainer_tools.hooks.utils import remove_disabled_hooks
-from graph_attention.data import get_dataset, get_transforms, get_batch_transforms
-from graph_attention.training.utils import StepInitHook, load_pretrained
+from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
+from graph_attention.training.utils import load_pretrained
 from graph_attention.training.trainer import GraphAttentionTrainer
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 log = logging.getLogger(__name__)
+
+
+def _can_use_torch_compile() -> bool:
+    try:
+        import triton  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def _default_compile_backend() -> str:
+    if sys.platform.startswith("linux"):
+        return "inductor"
+    else:
+        return "eager"
+
+
+def _resolve_compile_backend(cfg: DictConfig):
+    if not cfg.torch.get("compile", False):
+        return None
+
+    backend = cfg.torch.get("compile_backend", None)
+    if backend is None:
+        backend = _default_compile_backend()
+    if isinstance(backend, str) and backend.lower() in {"none", "null", "false", "disable", "off"}:
+        return None
+    return backend
 
 
 def _build_datasets_and_loaders(cfg: DictConfig):
@@ -110,13 +138,25 @@ def add_training_hooks(hooks: list, scheduler, cfg: DictConfig):
         hooks.append(GradClipHook(max_norm=cfg.training.grad_clip))
 
     if cfg.training.get("init_step"):
-        hooks.append(StepInitHook(cfg.training.init_step))
+        print(
+            "Warning: StepInitHook is currently disabled. If you want to enable it, uncomment the line in add_training_hooks."
+        )
+        # hooks.append(StepInitHook(cfg.training.init_step))
 
-    batch_tfms = get_batch_transforms(
-        cfg.dataset.variant, cfg.model.num_classes, cfg.dataset.augmentation, train=True
+    batch_x_tfms = get_batch_transforms(cfg.dataset.variant, cfg.dataset.augmentation, train=True)
+    valid_x_tfms = get_batch_transforms(cfg.dataset.variant, train=False)
+    batch_label_tfms = get_batch_mixup_cutmix(
+        cfg.model.num_classes,
+        cfg.dataset.augmentation,
+        train=True,
     )
-    valid_batch_tfms = get_batch_transforms(cfg.dataset.variant, cfg.model.num_classes, train=False)
-    hooks.append(BatchTransformHook(x_tfm=batch_tfms, x_tfms_valid=valid_batch_tfms))
+    hooks.append(
+        BatchTransformHook(
+            x_tfm=batch_x_tfms,
+            x_tfms_valid=valid_x_tfms,
+            batch_tfms=batch_label_tfms,
+        )
+    )
 
 
 def build_trainer(model, train_dl, valid_dl, optimizer, hooks, cfg):
@@ -153,16 +193,20 @@ def main(cfg: DictConfig):
     model_cls = get_class(cfg.model._target_)
 
     if hasattr(model_cls, "load_from_timm"):
-        
-        timm_kwargs = {
-            "model_name": pretrained,
-            "num_classes": cfg.model.num_classes,
-            "pretrained": True,
-        } if pretrained and isinstance(pretrained, str) else {
-            "model_name": cfg.model.get("model_name", "resnet18"),
-            "num_classes": cfg.model.num_classes,
-            "pretrained": False,
-        }
+
+        timm_kwargs = (
+            {
+                "model_name": pretrained,
+                "num_classes": cfg.model.num_classes,
+                "pretrained": True,
+            }
+            if pretrained and isinstance(pretrained, str)
+            else {
+                "model_name": cfg.model.get("model_name", "resnet18"),
+                "num_classes": cfg.model.num_classes,
+                "pretrained": False,
+            }
+        )
         # Add any extra kwargs from config except reserved keys
         extra_kwargs = {
             k: v
@@ -185,13 +229,20 @@ def main(cfg: DictConfig):
         model = load_pretrained(model, p)
 
     torch.set_float32_matmul_precision(cfg.torch.get("matmul_precision", "high"))
-    model = torch.compile(model) if cfg.torch.get("compile", False) else model
+    backend = _resolve_compile_backend(cfg)
+    if backend:
+        if backend == "inductor" and not _can_use_torch_compile():
+            log.warning("torch.compile backend 'inductor' requested but Triton is unavailable. Falling back to eager.")
+            backend = "eager"
+        try:
+            model = torch.compile(model, backend=backend)
+        except Exception as e:
+            log.warning(f"torch.compile failed (backend={backend}). Continuing without compilation. Error: {e}")
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
         model = nn.DataParallel(model)
-        
-    optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
 
+    optimizer, scheduler = _build_optimizer_and_scheduler(cfg, model, train_dataloader)
 
     hooks = build_hooks(cfg.hooks, config=cfg)
     add_training_hooks(hooks, scheduler, cfg)
@@ -213,7 +264,7 @@ def main(cfg: DictConfig):
         trainer.fit()
         log.info("Training complete!")
     except KeyboardInterrupt:
-        log.info("\nTraining interrupted by user.")
+        log.info("Training interrupted by user.")
 
 
 if __name__ == "__main__":

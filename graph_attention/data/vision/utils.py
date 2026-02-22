@@ -43,9 +43,9 @@ def get_transforms(variant: str, train: bool = True, augmentation: str = "standa
     return info["transform_factory"](train, augmentation, "cpu")
 
 
-def get_batch_transforms(variant: str, num_classes: int, augmentation: str = "standard", train: bool = True):
+def get_batch_transforms(variant: str, augmentation: str = "standard", train: bool = True):
     """
-    Returns GPU-ready batch transforms (Augmentations, Float conversion, Normalize, MixUp).
+    Returns batch transforms for images
     """
     info = get_registry_info(variant)
     transforms = []
@@ -58,14 +58,19 @@ def get_batch_transforms(variant: str, num_classes: int, augmentation: str = "st
     transforms.append(v2.ToDtype(torch.float32, scale=True))
     transforms.append(v2.Normalize(mean=info["mean"], std=info["std"]))
 
-    if train and augmentation == "strong":
-        transforms.append(
-            v2.RandomChoice(
-                [v2.MixUp(alpha=0.8, num_classes=num_classes), v2.CutMix(alpha=1.0, num_classes=num_classes)]
-            )
-        )
-
     return v2.Compose(transforms)
+
+
+def get_batch_mixup_cutmix(num_classes: int, augmentation: str = "standard", train: bool = True):
+    """
+    Returns batch-level MixUp/CutMix transforms that operate on (images, labels).
+    """
+    if not train or augmentation != "strong":
+        return None
+
+    return v2.RandomChoice(
+        [v2.MixUp(alpha=0.8, num_classes=num_classes), v2.CutMix(alpha=1.0, num_classes=num_classes)]
+    )
 
 
 def get_dataset(

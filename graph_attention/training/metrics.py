@@ -1,8 +1,9 @@
 import torch
 from torch._dynamo import disable
-from trainer_tools.hooks.metrics import Metric
+from trainer_tools.hooks.metrics import Metric, Accuracy
 from ..models.layers import AGFAttention, Attention
 
+__all__ = ["LayerActivationStats", "AccuracyMixup"]
 
 class LayerActivationStats(Metric):
     """
@@ -69,3 +70,18 @@ class LayerActivationStats(Metric):
         data = self._stats.copy()
         self._stats.clear()
         return data
+
+
+class AccuracyMixup(Accuracy):
+    """Like accuracy, but supports mixed targets."""
+
+    def __call__(self, trainer):
+        target = trainer.get_target(trainer.batch)
+        logits = trainer.preds["logits"] if isinstance(trainer.preds, dict) else trainer.preds
+        preds = logits.argmax(dim=1) if logits.ndim > 1 else (logits > 0)
+
+        if target.ndim > 1: # handle mixed targets
+            acc = target.gather(1, preds.unsqueeze(1)).squeeze(1)
+        else:
+            acc = (preds == target).float()
+        return {self.name: acc.mean().item()}
