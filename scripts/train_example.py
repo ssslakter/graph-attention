@@ -31,7 +31,7 @@ AUGMENTATION = "standard"
 DEVICE = "cuda"
 GRAD_ACUM = 1
 PROJECT = "resnet18-attn"
-RUN_NAME = "resnet18"
+RUN_NAME = "resnet18_base"
 
 random_seed(SEED)
 torch.set_float32_matmul_precision("high")
@@ -87,7 +87,7 @@ def main():
             x_tfms_valid=get_batch_transforms(DATASET, train=False),
             batch_tfms=get_batch_mixup_cutmix(NUM_CLASSES, AUGMENTATION, train=True),
         ),
-        CheckpointHook("outputs/test/checkpoints", save_every_steps=5000),
+        CheckpointHook(f"outputs/{RUN_NAME}/checkpoints", save_every_steps=5000),
         MetricsHook(
             verbose=True,
             metrics=[Loss(), Accuracy(), LRStats()],
