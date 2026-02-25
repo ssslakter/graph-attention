@@ -9,170 +9,103 @@ from trainer_tools.all import (
     GradClipHook,
     CheckpointHook,
     MetricsHook,
-    BatchTransformHook
+    BatchTransformHook,
+    GradientAccumulationHook,
 )
+from trainer_tools.hooks.accelerate import AccelerateHook
 from trainer_tools.hooks.metrics import Loss, Accuracy, LRStats
 from graph_attention.data import get_dataset, get_transforms, get_batch_transforms, get_batch_mixup_cutmix
 from graph_attention.models.attn_resnet import AttnResNet
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from trainer_tools.utils import random_seed
-import logging
 
-# --- Configuration Constants ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
-logger = logging.getLogger(__name__)
+SEED = 42
+EPOCHS = 5
+BATCH_SIZE = 256
+LR = 8e-4
+WEIGHT_DECAY = 0.05
+NUM_CLASSES = 10
+DATASET = "imagenette"
+AUGMENTATION = "standard"
+DEVICE = "cuda"
+GRAD_ACUM = 1
+PROJECT = "resnet18-attn"
+RUN_NAME = "resnet18"
 
-# Model Config
-MODEL_PRETRAINED = "resnet18"
-MODEL_ATTN_LAYER_INDICES = []
-MODEL_REGION_SIZE = 16
-MODEL_NUM_CLASSES = 10
-MODEL_CHANNELS = 3
-
-# Dataset Config
-DATASET_VARIANT = "imagenette"
-DATASET_ROOT = "data"
-DATASET_AUGMENTATION = "standard"
-
-# Dataloader Config
-DATALOADER_BATCH_SIZE = 256
-DATALOADER_VALID_BATCH_SIZE = 256
-DATALOADER_NUM_WORKERS = 4
-DATALOADER_PIN_MEMORY = True
-DATALOADER_PERSISTENT_WORKERS = True
-DATALOADER_PREFETCH_FACTOR = 1
-
-# Optimizer Config
-OPTIMIZER_LR = 8e-4
-OPTIMIZER_WEIGHT_DECAY = 0.05
-OPTIMIZER_FUSED = True
-
-# Scheduler Config
-SCHEDULER_T_MAX_FACTOR = 1  # Will be multiplied by total_steps
-
-# Training Config
-TRAINING_SEED = 42
-TRAINING_EPOCHS = 5
-TRAINING_USE_AMP = True
-TRAINING_AMP_DTYPE = torch.float16
-TRAINING_DEVICE = "cuda"
-TRAINING_GRAD_CLIP = 1.0
-TRAINING_LABEL_SMOOTHING = 0.0
-
-# Torch Config
-TORCH_COMPILE = False
-TORCH_MATMUL_PRECISION = "high"
-
-# --- Main Training Script ---
-
-# Set random seed
-random_seed(TRAINING_SEED)
-
-# Set torch settings
-torch.set_float32_matmul_precision(TORCH_MATMUL_PRECISION)
+random_seed(SEED)
+torch.set_float32_matmul_precision("high")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 
-def main():
-    # --- Data Loading ---
-    train_transforms = get_transforms(DATASET_VARIANT, train=True, augmentation=DATASET_AUGMENTATION)
-    train_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=True, transforms=train_transforms)
-
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=DATALOADER_BATCH_SIZE,
-        shuffle=True,
-        num_workers=DATALOADER_NUM_WORKERS,
-        pin_memory=DATALOADER_PIN_MEMORY,
-        persistent_workers=DATALOADER_PERSISTENT_WORKERS,
-        prefetch_factor=DATALOADER_PREFETCH_FACTOR,
-    )
-
-    valid_dataset = get_dataset(DATASET_VARIANT, DATASET_ROOT, train=False)
-    valid_dataloader = DataLoader(
-        valid_dataset,
-        batch_size=DATALOADER_VALID_BATCH_SIZE,
-        shuffle=False,
+def make_dataloader(dataset, train=True):
+    return DataLoader(
+        dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=train,
         num_workers=4,
-        pin_memory=DATALOADER_PIN_MEMORY,
-        persistent_workers=False,
-        prefetch_factor=2,
+        pin_memory=True,
+        persistent_workers=train,
+        prefetch_factor=1 if train else 2,
     )
 
-    # --- Model ---
-    model = AttnResNet.load_from_timm(
-        model_name=MODEL_PRETRAINED,
-        num_classes=MODEL_NUM_CLASSES,
-        pretrained=True,
-        attn_layer_indices=MODEL_ATTN_LAYER_INDICES,
-        region_size=MODEL_REGION_SIZE,
-    )
 
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs!")
-        model = nn.DataParallel(model)
-
-    if TORCH_COMPILE:
-        model = torch.compile(model)
-
-    optimizer = AdamW(model.parameters(), lr=OPTIMIZER_LR, weight_decay=OPTIMIZER_WEIGHT_DECAY, fused=OPTIMIZER_FUSED)
-
-    total_steps = len(train_dataloader) * TRAINING_EPOCHS
-    scheduler = CosineAnnealingLR(optimizer, T_max=int(total_steps * SCHEDULER_T_MAX_FACTOR))
-
-    # --- Hooks ---
-    hooks = []
-    hooks.insert(0, ProgressBarHook())
-    hooks.append(LRSchedulerHook(scheduler))
-
-    if TRAINING_USE_AMP:
-        hooks.append(AMPHook(dtype=TRAINING_AMP_DTYPE, device_type=TRAINING_DEVICE))
-    if TRAINING_GRAD_CLIP:
-        hooks.append(GradClipHook(max_norm=TRAINING_GRAD_CLIP))
-
-    batch_x_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
-    valid_x_tfms = get_batch_transforms(DATASET_VARIANT, MODEL_NUM_CLASSES, train=False)
-    batch_label_tfms = get_batch_mixup_cutmix(MODEL_NUM_CLASSES, DATASET_AUGMENTATION, train=True)
-    hooks.append(
-        BatchTransformHook(
-            x_tfm=batch_x_tfms,
-            x_tfms_valid=valid_x_tfms,
-            batch_tfms=batch_label_tfms,
+def main():
+    train_dl = make_dataloader(
+        get_dataset(
+            DATASET, "data", train=True, transforms=get_transforms(DATASET, train=True, augmentation=AUGMENTATION)
         )
     )
+    valid_dl = make_dataloader(get_dataset(DATASET, "data", train=False), train=False)
 
-    hooks.append(CheckpointHook("outputs/test/checkpoints", save_every_steps=5000))
-    hooks.append(
+    model = AttnResNet.load_from_timm(
+        model_name="resnet18",
+        num_classes=NUM_CLASSES,
+        pretrained=True,
+        attn_layer_indices=[],
+        region_size=16,
+    )
+    optimizer = AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY, fused=True)
+    scheduler = CosineAnnealingLR(optimizer, T_max=len(train_dl) * EPOCHS)
+
+    multi_gpu = torch.cuda.device_count() > 1
+    hooks = [
+        ProgressBarHook(),
+        LRSchedulerHook(scheduler),
+        *(
+            [AccelerateHook(max_grad_norm=1.0, gradient_accumulation_steps=GRAD_ACUM, mixed_precision = 'bf16')]
+            if multi_gpu
+            else [
+                AMPHook(dtype=torch.float16, device_type=DEVICE),
+                GradClipHook(max_norm=1.0),
+                GradientAccumulationHook(steps=GRAD_ACUM),
+            ]
+        ),
+        BatchTransformHook(
+            x_tfm=get_batch_transforms(DATASET, AUGMENTATION, train=True),
+            x_tfms_valid=get_batch_transforms(DATASET, train=False),
+            batch_tfms=get_batch_mixup_cutmix(NUM_CLASSES, AUGMENTATION, train=True),
+        ),
+        CheckpointHook("outputs/test/checkpoints", save_every_steps=5000),
         MetricsHook(
             verbose=True,
-            metrics=[
-                Loss(),
-                Accuracy(),
-                LRStats(),
-            ],
+            metrics=[Loss(), Accuracy(), LRStats()],
             tracker_type="trackio",
-            project="resnet18-attn",
-        )
-    )
+            project=PROJECT,
+            name=RUN_NAME,
+        ),
+    ]
 
-    # --- Trainer ---
-    trainer = Trainer(
+    Trainer(
         model=model,
-        train_dl=train_dataloader,
-        valid_dl=valid_dataloader,
+        train_dl=train_dl,
+        valid_dl=valid_dl,
         optim=optimizer,
-        loss_func=torch.nn.CrossEntropyLoss(label_smoothing=TRAINING_LABEL_SMOOTHING),
-        epochs=TRAINING_EPOCHS,
+        loss_func=nn.CrossEntropyLoss(),
+        epochs=EPOCHS,
         hooks=hooks,
-    )
-    print("Starting training...")
-    try:
-        trainer.fit()
-        print("Training complete!")
-    except KeyboardInterrupt:
-        print("\nTraining interrupted by user.")
+    ).fit()
 
 
 if __name__ == "__main__":
