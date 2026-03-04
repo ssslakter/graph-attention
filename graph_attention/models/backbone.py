@@ -24,7 +24,7 @@ class TransformerBlock(nn.Module):
 class Transformer(nn.Module):
     """A sequence-to-sequence transformer backbone."""
 
-    def __init__(self, depth: int, dim: int, num_heads: int, attention_layer: int, mlp_ratio=4.0, **agf_kwargs):
+    def __init__(self, depth: int, dim: int, num_heads: int, attention_layer, mlp_ratio=4.0, **agf_kwargs):
         super().__init__()
         self.blocks = nn.ModuleList(
             [
