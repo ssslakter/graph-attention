@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 from typing import Union, Tuple, Callable
-from .layers import ViTBlock
+from .backbone import Transformer
 
 
 from einops.layers.torch import Rearrange
@@ -66,15 +66,7 @@ class SimpleViT(nn.Module):
             dim=dim,
         )
         self.register_buffer("pos_embedding", pos_embedding.unsqueeze(0))
-
-        self.blocks = nn.ModuleList(
-            [
-                ViTBlock(attention_layer, dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio)
-                for _ in range(depth)
-            ]
-        )
-
-        self.norm = nn.LayerNorm(dim)
+        self.backbone = Transformer(depth, dim, num_heads, attention_layer, mlp_ratio)
         self.head = nn.Linear(dim, num_classes)
         self.apply(self._init_weights)
 
@@ -90,9 +82,6 @@ class SimpleViT(nn.Module):
     def forward(self, img):
         x = self.to_patch_embedding(img)
         x = x + self.pos_embedding
-
-        for blk in self.blocks:
-            x = blk(x)
-        x = self.norm(x)
+        x = self.backbone(x)
         x = x.mean(dim=1)
         return self.head(x)

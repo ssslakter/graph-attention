@@ -51,7 +51,6 @@ class AGFAttention(nn.Module):
         self.alphas_raw = nn.Parameter(torch.empty(order, num_heads))
         self.act = self._act_map.get(alphas_act.lower(), lambda x: x)
 
-        # State keys for regularization (ephemeral dict is risky for DDP/JIT, used properties)
         self.register_buffer("last_adj", None, persistent=False)
         self.register_buffer("last_x", None, persistent=False)
         self.reset_parameters()
@@ -140,6 +139,3 @@ class AGFAttention(nn.Module):
 
         bs, heads, n, _ = adj.shape
         return -smooth / (bs * heads * n)
-
-
-AGFLayer = AGFAttention  # Alias for backward compatibility
