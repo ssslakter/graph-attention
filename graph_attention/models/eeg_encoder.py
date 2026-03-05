@@ -175,8 +175,8 @@ class DSTS(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, C, T)
-        h_tcn = self.tcn(x)[:, -1, :]                        # (B, dim) — last time step
-        h_tf = self.transformer(x.transpose(1, 2))[:, -1, :] # (B, dim)
+        h_tcn = self.tcn(x)[:, -1, :]  # (B, dim) — last time step
+        h_tf = self.transformer(x.transpose(1, 2))[:, -1, :]  # (B, dim)
         return self.mlp(h_tcn + h_tf)
 
 
@@ -200,6 +200,7 @@ class EEGEncoder(nn.Module):
         num_classes: int = 4,
         num_branches: int = 5,
         dropout: float = 0.3,
+        max_relative_position: int = 128,
         **attn_kwargs,
     ):
         super().__init__()
@@ -208,7 +209,14 @@ class EEGEncoder(nn.Module):
             [
                 nn.Sequential(
                     nn.Dropout(dropout),
-                    DSTS(in_channels=32, dim=32, num_classes=num_classes, dropout=dropout, **attn_kwargs),
+                    DSTS(
+                        in_channels=32,
+                        dim=32,
+                        num_classes=num_classes,
+                        dropout=dropout,
+                        max_relative_position=max_relative_position,
+                        **attn_kwargs,
+                    ),
                 )
                 for _ in range(num_branches)
             ]

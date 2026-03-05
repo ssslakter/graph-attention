@@ -37,15 +37,22 @@ class AGFAttention(nn.Module):
         top_k: Optional[int] = None,
         basis: str = "monomial",
         alphas_act: str = "sigmoid",
+        max_relative_position: Optional[int] = None,
     ):
         super().__init__()
         self.num_heads, self.dim_head, self.order, self.k = num_heads, dim_head, order, top_k
+        self.max_relative_position = max_relative_position
         self.alphas_act_name = alphas_act.lower()
         self.basis, self.scale = basis.lower(), dim_head**-0.5
 
         inner = num_heads * dim_head
         self.to_qkv = nn.Linear(dim, inner * 3, bias=True)
         self.to_out = nn.Linear(inner, dim, bias=True)
+
+        if self.max_relative_position is not None and self.max_relative_position > 0:
+            vocab_size = 2 * self.max_relative_position + 1
+            self.relative_position_k = nn.Embedding(vocab_size, dim_head)
+            self.relative_position_v = nn.Embedding(vocab_size, dim_head)
 
         # Coefficients
         self.alphas_raw = nn.Parameter(torch.empty(order, num_heads))
@@ -54,7 +61,7 @@ class AGFAttention(nn.Module):
         self.register_buffer("last_adj", None, persistent=False)
         self.register_buffer("last_x", None, persistent=False)
         self.reset_parameters()
-    
+
     @property
     def alphas(self):
         return self.act(self.alphas_raw)
@@ -62,24 +69,24 @@ class AGFAttention(nn.Module):
     @torch.no_grad()
     def reset_parameters(self):
         """
-        Initializes alpha coefficients with a decay factor to prevent 
+        Initializes alpha coefficients with a decay factor to prevent
         vanishing gradients and focus initially on low-order terms.
         """
         indices = torch.arange(self.order, device=self.alphas_raw.device).float()
-        
+
         if self.alphas_act_name == "softmax":
-            init_values = torch.exp(-indices) # [1.0, 0.36, 0.13, ...]
+            init_values = torch.exp(-indices)  # [1.0, 0.36, 0.13, ...]
         elif self.alphas_act_name in ["sigmoid", "tanh"]:
-            init_values = 0.5 * torch.exp(-indices) 
+            init_values = 0.5 * torch.exp(-indices)
         else:
             init_values = torch.ones(self.order) / self.order
 
         init_values = init_values.unsqueeze(-1).repeat(1, self.num_heads)
         self.alphas_raw.copy_(init_values)
-        
+
         return self
 
-    def forward(self, x, mask=None):
+    def forward(self, x, mask=None, is_causal: bool = False):
         b, n, _ = x.shape
         h = self.num_heads
         self.last_x = x
@@ -89,7 +96,21 @@ class AGFAttention(nn.Module):
 
         attn_scores: Tensor = (q @ k.transpose(-1, -2)) * self.scale
 
-        if mask is not None:
+        if self.max_relative_position:
+            coords = torch.arange(n, device=x.device)
+            distance = coords[:, None] - coords[None, :]  # Shape: (N, N)
+            distance = torch.clamp(distance, -self.max_relative_position, self.max_relative_position)
+            distance = distance + self.max_relative_position
+
+            rel_k = self.relative_position_k(distance)  # (N, N, D)
+
+            rel_k_scores = torch.einsum("bhid,ijd->bhij", q, rel_k)
+            attn_scores = attn_scores + rel_k_scores
+
+        if is_causal and mask is None:
+            causal_mask = torch.ones((n, n), device=x.device, dtype=torch.bool).tril()
+            attn_scores = attn_scores.masked_fill(~causal_mask, float("-inf"))
+        elif mask is not None:
             mask_bc = mask.view(b, 1, 1, n)
             if mask.dtype == torch.bool:
                 attn_scores = attn_scores.masked_fill(~mask_bc, float("-inf"))
@@ -107,16 +128,23 @@ class AGFAttention(nn.Module):
             attn, v = attn.float(), v.float()
             alphas = self.act(self.alphas_raw).view(-1, 1, h, 1, 1).float()
 
+            if self.max_relative_position:
+                rel_v = self.relative_position_v(distance).float()
+
             res = 0
             v_prev, v_curr = None, v
 
             for i in range(self.order):
+                a_v = attn @ v_curr
+
+                if i == 0 and self.max_relative_position:
+                    a_v = a_v + torch.einsum("bhij,ijd->bhid", attn, rel_v)
+
                 if self.basis == "monomial":
-                    v_curr = attn @ v_curr
+                    v_curr = a_v
                 else:
                     # Chebyshev Recurrence: T_k = 2(2A - I)T_{k-1} - T_{k-2}
-                    # l_v represents (2A - I)T_{k-1}
-                    l_v = 2 * (attn @ v_curr) - v_curr
+                    l_v = 2 * a_v - v_curr
                     v_next = (2 * l_v - v_prev) if v_prev is not None else l_v
                     v_prev, v_curr = v_curr, v_next
 
