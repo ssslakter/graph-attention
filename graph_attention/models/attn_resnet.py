@@ -3,7 +3,11 @@ import torch.nn as nn, torch.nn.functional as F
 import timm
 from einops import rearrange, einsum, reduce
 import os
+from typing import TypedDict
 
+class ResNetConfig(TypedDict):
+    block: type["BasicBlock"] | type["Bottleneck"]
+    layers: list[int]
 
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -95,9 +99,9 @@ class Bottleneck(nn.Module):
 class AttnResNet(nn.Module):
     def __init__(
         self,
-        block: type[BasicBlock],
+        block: type[BasicBlock] |  type[Bottleneck],
         layers: list[int],
-        attn_layer_indices: list[int] = None,
+        attn_layer_indices: list[int] | None = None,
         num_classes: int = 1000,
         in_chans: int = 3,
         region_size: int = 4,
@@ -120,7 +124,7 @@ class AttnResNet(nn.Module):
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
-    def _make_layer(self, block: type[BasicBlock], planes, blocks, stride=1, block_idx=0):
+    def _make_layer(self, block: type[BasicBlock] |  type[Bottleneck], planes, blocks, stride=1, block_idx=0):
         downsample = None
         if block_idx in self.attn_layer_indices:
             current_block = ChannelAttentionResBlock
@@ -148,7 +152,7 @@ class AttnResNet(nn.Module):
     @classmethod
     def load_from_timm(cls, model_name, num_classes=1000, pretrained=True, attn_layer_indices=None, **kwargs):
         # Configuration mapping for common models
-        configs = {
+        configs: dict[str, ResNetConfig] = {
             "resnet18": {"block": BasicBlock, "layers": [2, 2, 2, 2]},
             "resnet34": {"block": BasicBlock, "layers": [3, 4, 6, 3]},
             "resnet50": {"block": Bottleneck, "layers": [3, 4, 6, 3]},

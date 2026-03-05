@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 from typing import Union, Tuple, Callable
-from .backbone import Transformer
+from .transformer import Transformer
 
 
 from einops.layers.torch import Rearrange

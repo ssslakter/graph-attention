@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from einops.layers.torch import Rearrange
-from .backbone import Transformer
+from .transformer import Transformer
 from .layers import Attention
 
 
