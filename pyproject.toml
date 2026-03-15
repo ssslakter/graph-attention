@@ -4,11 +4,11 @@ authors = [
 ]
 dependencies = [
     "einops>=0.8.1,<0.9",
-    "trainer-tools[trackio,hydra] @ https://github.com/ssslakter/trainer-tools.git",
+    "trainer-tools[trackio,hydra] @ git+https://github.com/ssslakter/trainer-tools.git",
     "black>=26.1.0,<27",
     "numpy<2.4",
     "plotly>=6.5.2,<7",
-    "trackio-ui @ https://github.com/ssslakter/trackio_ui.git",
+    "trackio-ui @ git+https://github.com/ssslakter/trackio_ui.git",
     "timm>=1.0.24,<2",
     "scipy>=1.17.0,<2",
     "datasets>=4.5.0,<5",
