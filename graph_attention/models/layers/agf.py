@@ -33,7 +33,7 @@ class AGFAttention(nn.Module):
         dim: int,
         num_heads: int,
         dim_head: int = 64,
-        order: int = 3,
+        order: int = 2,
         top_k: Optional[int] = None,
         basis: str = "monomial",
         alphas_act: str = "sigmoid",
@@ -41,6 +41,7 @@ class AGFAttention(nn.Module):
     ):
         super().__init__()
         self.num_heads, self.dim_head, self.order, self.k = num_heads, dim_head, order, top_k
+        self.topk_ratio = 0.25 if top_k is None else None
         self.max_relative_position = max_relative_position
         self.alphas_act_name = alphas_act.lower()
         self.basis, self.scale = basis.lower(), dim_head**-0.5
@@ -117,9 +118,11 @@ class AGFAttention(nn.Module):
             else:
                 attn_scores = attn_scores.masked_fill(mask_bc == 0, float("-inf"))
 
-        if self.k and self.k < n:
-            top_val = attn_scores.topk(self.k, dim=-1)[0][..., -1:]
-            attn_scores = attn_scores.masked_fill(attn_scores < top_val, float("-inf"))
+        k = self.k if self.k is not None else int(self.topk_ratio * n)
+        if k > 0 and k < n:
+            top_vals, _ = torch.topk(attn_scores, k, dim=-1)
+            threshold = top_vals[..., -1:]
+            attn_scores = attn_scores.masked_fill(attn_scores < threshold, float("-inf"))
 
         attn = attn_scores.softmax(dim=-1)
         self.last_adj = attn

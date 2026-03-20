@@ -116,9 +116,8 @@ class TrainConfig:
     epochs: int = 500
     batch_size: int = 64
     lr: float = 1e-3
-    label_smoothing: float = 0.1
     dropout: float = 0.3
-    weight_decay: float = 0.5  # только для Linear
+    weight_decay: float = 0.0005  # только для Linear
     spectral_loss_lambda: float = 0.01
     checkpoint_every_epochs: int = 10
 
@@ -239,7 +238,8 @@ class HistoryHook:
             valid_loss = float("nan")
             valid_acc = float("nan")
             valid_kappa = float("nan")
-
+        if trainer.epoch % 20 == 0:
+            print(valid_acc, valid_loss, valid_kappa)
         self.valid_loss.append(valid_loss)
         self.valid_acc.append(valid_acc)
         self.valid_kappa.append(valid_kappa)
@@ -321,7 +321,7 @@ def run_subject(
             train_dl=train_loader,
             valid_dl=test_loader,
             optim=optimizer,
-            loss_func=nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing),
+            loss_func=nn.CrossEntropyLoss(),
             epochs=cfg.epochs,
             hooks=[
                 history_hook,
