@@ -26,6 +26,10 @@ class Transformer(nn.Module):
 
     def __init__(self, depth: int, dim: int, num_heads: int, attention_layer, mlp_ratio=4.0, **agf_kwargs):
         super().__init__()
+        self.num_heads = num_heads
+        self.dim = dim
+        self.mlp_ratio = mlp_ratio
+        self.depth = depth
         self.blocks = nn.ModuleList(
             [
                 TransformerBlock(attention_layer, dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio, **agf_kwargs)

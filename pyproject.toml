@@ -4,16 +4,17 @@ authors = [
 ]
 dependencies = [
     "einops>=0.8.1,<0.9",
-    "trainer-tools[trackio,hydra] @ https://github.com/ssslakter/trainer-tools.git",
+    "trainer-tools[trackio,hydra] @ git+https://github.com/ssslakter/trainer-tools.git",
     "black>=26.1.0,<27",
     "numpy<2.4",
     "plotly>=6.5.2,<7",
-    "trackio-ui @ https://github.com/ssslakter/trackio_ui.git",
+    "trackio-ui @ git+https://github.com/ssslakter/trackio_ui.git",
     "timm>=1.0.24,<2",
     "scipy>=1.17.0,<2",
     "datasets>=4.5.0,<5",
     "viztracer>=1.1.1,<2",
-    "jupyter"
+    "jupyter",
+    "scikit-learn>=1.8.0,<2",
 ]
 name = "graph-attention"
 requires-python = ">= 3.11,<3.14"
@@ -24,17 +25,17 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [tool.pixi.workspace]
-channels = ["pytorch","conda-forge"]
+channels = ["pytorch", "conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64"]
 
-[tool.pixi.target.osx-64.dependencies] 
+[tool.pixi.target.osx-64.dependencies]
 # torch for old macs is only available for python <3.13
 python = "<3.13"
-[tool.pixi.target.osx-64.pypi-dependencies] 
-torch = { version = "*", index = "https://download.pytorch.org/whl/cpu"}
+[tool.pixi.target.osx-64.pypi-dependencies]
+torch = { version = "*", index = "https://download.pytorch.org/whl/cpu" }
 
 [tool.pixi.target.win-64.pypi-dependencies]
-torch = { version = "*", index = "https://download.pytorch.org/whl/cu130"}
+torch = { version = "*", index = "https://download.pytorch.org/whl/cu130" }
 
 [tool.pixi.pypi-dependencies]
 graph_attention = { path = ".", editable = true }

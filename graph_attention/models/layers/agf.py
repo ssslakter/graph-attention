@@ -38,9 +38,12 @@ class AGFAttention(nn.Module):
         basis: str = "monomial",
         alphas_act: str = "sigmoid",
         max_relative_position: Optional[int] = None,
+        normalization: str = "softmax",
     ):
         super().__init__()
         self.num_heads, self.dim_head, self.order, self.k = num_heads, dim_head, order, top_k
+        self.normalization = normalization
+        self.order += 1 # Include the 0-th order term
         self.max_relative_position = max_relative_position
         self.alphas_act_name = alphas_act.lower()
         self.basis, self.scale = basis.lower(), dim_head**-0.5
@@ -55,7 +58,7 @@ class AGFAttention(nn.Module):
             self.relative_position_v = nn.Embedding(vocab_size, dim_head)
 
         # Coefficients
-        self.alphas_raw = nn.Parameter(torch.empty(order, num_heads))
+        self.alphas_raw = nn.Parameter(torch.empty(self.order, num_heads))
         self.act = self._act_map.get(alphas_act.lower(), lambda x: x)
 
         self.register_buffer("last_adj", None, persistent=False)
@@ -65,6 +68,16 @@ class AGFAttention(nn.Module):
     @property
     def alphas(self):
         return self.act(self.alphas_raw)
+
+    def _build_adj(self, attn_scores):
+        """Builds adjacency matrix from raw attention scores."""
+        if self.normalization == "gelu":
+            A = F.gelu(attn_scores)
+            # Degree-normalise: D^{-1} A  (directed random walk)
+            deg = A.sum(dim=-1, keepdim=True).clamp(min=1e-6)
+            return A / deg
+        else:
+            return attn_scores.softmax(dim=-1)
 
     @torch.no_grad()
     def reset_parameters(self):
@@ -77,7 +90,10 @@ class AGFAttention(nn.Module):
         if self.alphas_act_name == "softmax":
             init_values = torch.exp(-indices)  # [1.0, 0.36, 0.13, ...]
         elif self.alphas_act_name in ["sigmoid", "tanh"]:
-            init_values = 0.5 * torch.exp(-indices)
+            if self.normalization == "softmax":
+                init_values = torch.zeros(self.order)
+            else:
+                init_values = 0.5 * torch.exp(-indices)
         else:
             init_values = torch.ones(self.order) / self.order
 
@@ -121,23 +137,23 @@ class AGFAttention(nn.Module):
             top_val = attn_scores.topk(self.k, dim=-1)[0][..., -1:]
             attn_scores = attn_scores.masked_fill(attn_scores < top_val, float("-inf"))
 
-        attn = attn_scores.softmax(dim=-1)
-        self.last_adj = attn
+        attn = self._build_adj(attn_scores)
+        self.last_adj, self.v = attn.detach(), v.detach()
 
         with torch.autocast(device_type=x.device.type, enabled=False):
             attn, v = attn.float(), v.float()
-            alphas = self.act(self.alphas_raw).view(-1, 1, h, 1, 1).float()
+            alphas = self.alphas.view(self.order, 1, self.num_heads, 1, 1).float()
 
             if self.max_relative_position:
                 rel_v = self.relative_position_v(distance).float()
 
-            res = 0
+            res = alphas[0] * v
             v_prev, v_curr = None, v
 
-            for i in range(self.order):
+            for i in range(1,self.order):
                 a_v = attn @ v_curr
 
-                if i == 0 and self.max_relative_position:
+                if i == 1 and self.max_relative_position:
                     a_v = a_v + torch.einsum("bhij,ijd->bhid", attn, rel_v)
 
                 if self.basis == "monomial":
