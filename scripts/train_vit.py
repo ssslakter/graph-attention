@@ -72,7 +72,7 @@ def train_model(num_heads: int, top_k: int, order: int, alphas_act: str, run_nam
             top_k=top_k,
             order=order,
             alphas_act=alphas_act,
-            normalization="doubly_stochastic",
+            normalization="softmax",
         ),
     )
 
