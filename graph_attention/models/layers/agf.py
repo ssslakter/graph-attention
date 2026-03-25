@@ -149,12 +149,16 @@ class AGFAttention(nn.Module):
 
             res = alphas[0] * v
             v_prev, v_curr = None, v
+            v_norm = v.norm(dim=-1, keepdim=True)
 
             for i in range(1,self.order):
                 a_v = attn @ v_curr
 
                 if i == 1 and self.max_relative_position:
                     a_v = a_v + torch.einsum("bhij,ijd->bhid", attn, rel_v)
+
+                current_norm = a_v.norm(dim=-1, keepdim=True)
+                a_v = a_v * (v_norm / (current_norm + 1e-6))
 
                 if self.basis == "monomial":
                     v_curr = a_v

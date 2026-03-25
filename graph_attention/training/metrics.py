@@ -29,26 +29,26 @@ class LayerActivationStats(Metric):
             x_in = inp[0] if isinstance(inp, tuple) else inp
 
             with torch.no_grad():
-                in_n = x_in.norm(p=2, dim=-1).mean().item()
-                out_n = out.norm(p=2, dim=-1).mean().item()
+                # in_n = x_in.norm(p=2, dim=-1).mean().item()
+                # out_n = out.norm(p=2, dim=-1).mean().item()
 
-                self._stats.update(
-                    {
-                        f"debug/norms/{name}/in_norm": in_n,
-                        f"debug/norms/{name}/out_norm": out_n,
-                    }
-                )
+                # self._stats.update(
+                #     {
+                #         f"debug/norms/{name}/in_norm": in_n,
+                #         f"debug/norms/{name}/out_norm": out_n,
+                #     }
+                # )
 
                 # Expected shape: (Order + 1, Heads)
                 if (alphas := getattr(module, "alphas", None)) is not None:
                     a_vals = alphas.detach().float()
 
                     for k, k_vals in enumerate(a_vals):  # Iterate over orders
-                        prefix = f"debug/alphas/{name}/alpha_{k}"
+                        prefix = f"debug/alphas/{name}"
 
                         # Log individual heads
                         for h, val in enumerate(k_vals):
-                            self._stats[f"{prefix}/h{h:02d}"] = val.item()
+                            self._stats[f"{prefix}/h{h:02d}/alpha_{k}"] = val.item()
 
         return hook
 
